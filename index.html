@@ -1,0 +1,1963 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendar Invite Generator</title>
+<script>
+// Apply the saved theme before first paint to avoid a flash.
+(function () {
+  try {
+    var th = (JSON.parse(localStorage.getItem("icsSettings") || "{}") || {}).theme;
+    if (typeof th !== "string" || !/^[a-z-]+$/.test(th) || th === "system") {
+      th = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.setAttribute("data-theme", th);
+  } catch (e) {}
+})();
+</script>
+<style>
+  /* Themes. The data-theme attribute on <html> is set by script ("system" resolves to light or dark).
+     Each theme defines: bg, card, text, muted, border, accent, accent-text, danger, success. */
+  :root, :root[data-theme="light"] {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #5d6677; --border: #cfd5df;
+    --accent: #1b5fd1; --accent-text: #ffffff; --danger: #c62828; --success: #2e7d32;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171d; --card: #1d222b; --text: #e6e9ef; --muted: #9aa3b2; --border: #3a4252;
+    --accent: #5b9bff; --accent-text: #0c1018; --danger: #ff6b6b; --success: #5fcf80;
+    color-scheme: dark;
+  }
+  /* Rosé Pine */
+  :root[data-theme="rose-pine"] {
+    --bg: #191724; --card: #1f1d2e; --text: #e0def4; --muted: #908caa; --border: #403d52;
+    --accent: #c4a7e7; --accent-text: #191724; --danger: #eb6f92; --success: #9ccfd8;
+    color-scheme: dark;
+  }
+  :root[data-theme="rose-pine-moon"] {
+    --bg: #232136; --card: #2a273f; --text: #e0def4; --muted: #908caa; --border: #44415a;
+    --accent: #c4a7e7; --accent-text: #232136; --danger: #eb6f92; --success: #9ccfd8;
+    color-scheme: dark;
+  }
+  :root[data-theme="rose-pine-dawn"] {
+    --bg: #faf4ed; --card: #fffaf3; --text: #575279; --muted: #6b6786; --border: #dfdad9;
+    --accent: #286983; --accent-text: #faf4ed; --danger: #b4637a; --success: #56949f;
+    color-scheme: light;
+  }
+  /* Nord */
+  :root[data-theme="nord"] {
+    --bg: #2e3440; --card: #3b4252; --text: #eceff4; --muted: #aab3c5; --border: #4c566a;
+    --accent: #88c0d0; --accent-text: #2e3440; --danger: #bf616a; --success: #a3be8c;
+    color-scheme: dark;
+  }
+  /* Dracula */
+  :root[data-theme="dracula"] {
+    --bg: #21222c; --card: #282a36; --text: #f8f8f2; --muted: #8f9acb; --border: #44475a;
+    --accent: #bd93f9; --accent-text: #282a36; --danger: #ff5555; --success: #50fa7b;
+    color-scheme: dark;
+  }
+  /* Catppuccin */
+  :root[data-theme="catppuccin-latte"] {
+    --bg: #e6e9ef; --card: #eff1f5; --text: #4c4f69; --muted: #5c5f77; --border: #bcc0cc;
+    --accent: #8839ef; --accent-text: #eff1f5; --danger: #d20f39; --success: #40a02b;
+    color-scheme: light;
+  }
+  :root[data-theme="catppuccin-frappe"] {
+    --bg: #292c3c; --card: #303446; --text: #c6d0f5; --muted: #a5adce; --border: #51576d;
+    --accent: #ca9ee6; --accent-text: #232634; --danger: #e78284; --success: #a6d189;
+    color-scheme: dark;
+  }
+  :root[data-theme="catppuccin-macchiato"] {
+    --bg: #1e2030; --card: #24273a; --text: #cad3f5; --muted: #a5adcb; --border: #494d64;
+    --accent: #c6a0f6; --accent-text: #181926; --danger: #ed8796; --success: #a6da95;
+    color-scheme: dark;
+  }
+  :root[data-theme="catppuccin-mocha"] {
+    --bg: #181825; --card: #1e1e2e; --text: #cdd6f4; --muted: #a6adc8; --border: #45475a;
+    --accent: #cba6f7; --accent-text: #11111b; --danger: #f38ba8; --success: #a6e3a1;
+    color-scheme: dark;
+  }
+  :root {
+    --error-bg: color-mix(in srgb, var(--danger) 18%, var(--card));
+    --error-text: color-mix(in srgb, var(--danger) 45%, var(--text));
+    --ok-bg: color-mix(in srgb, var(--success) 18%, var(--card));
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, Roboto, sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; margin-bottom: 16px;
+  }
+  .cardhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .cardhead h2 { margin: 0; }
+  .cardbtns { display: flex; gap: 8px; }
+  .durrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 24px; }
+  .durtext { position: absolute; left: 2px; top: 100%; margin-top: 3px; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+  .durrow button { padding: 2px 10px; font-size: 0.85rem; font-weight: 500; }
+  #impMsg { white-space: pre-line; margin-top: 0; margin-bottom: 14px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30;
+    display: flex; gap: 12px; align-items: center; padding: 10px 14px;
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  }
+  .toast[hidden] { display: none; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .selbar { display: flex; gap: 16px; justify-content: flex-end; margin: 0 0 8px; }
+  .headleft { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .selwrap { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 500; font-size: 0.92rem; cursor: pointer; }
+  .selwrap input, .filemode input { width: auto; margin: 0; }
+  .evcard.excluded { border-style: dashed; }
+  .filemode { border: 0; padding: 0; margin: 18px 0 0; }
+  .filemode legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
+  .filemode label { display: flex; align-items: center; gap: 8px; font-weight: 500; margin: 4px 0; cursor: pointer; }
+  .summary { color: var(--muted); margin: 10px 0 0; font-size: 0.92rem; overflow-wrap: anywhere; }
+  .filelist { margin-top: 16px; }
+  .filelist .fileready { font-weight: 600; margin-bottom: 4px; }
+  .fileitem { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .fileinfo { min-width: 0; overflow-wrap: anywhere; }
+  .fileinfo .hint { display: block; }
+  label { display: block; font-weight: 600; margin: 14px 0 4px; }
+  .hint { font-weight: 400; color: var(--muted); font-size: 0.85rem; }
+  input, textarea, select {
+    width: 100%; padding: 9px 10px; font: inherit; color: var(--text);
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1.5fr 1.2fr 1fr 1fr; gap: 12px; align-items: end; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
+  .datewrap { position: relative; }
+  .datewrap input.date { padding-right: 42px; }
+  .datewrap .pick {
+    position: absolute; right: 2px; top: 2px; bottom: 2px; width: 38px; padding: 0;
+    border: 0; background: transparent; color: var(--accent); font-size: 1.1rem; line-height: 1;
+  }
+  .datewrap input.native {
+    position: absolute; right: 0; bottom: 0; width: 1px; height: 1px;
+    opacity: 0; pointer-events: none; padding: 0; border: 0;
+  }
+  .timewrap { position: relative; }
+  .timewrap input.time { padding-right: 36px; }
+  .timewrap .tbtn {
+    position: absolute; right: 2px; top: 2px; bottom: 2px; width: 32px; padding: 0;
+    border: 0; background: transparent; color: var(--accent); font-size: 0.95rem; line-height: 1;
+  }
+  .tlist {
+    position: absolute; left: 0; right: 0; top: 100%; z-index: 10; margin: 2px 0 0; padding: 4px 0;
+    list-style: none; max-height: 220px; overflow-y: auto;
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  }
+  .tlist[hidden] { display: none; }
+  .tlist li { padding: 6px 12px; cursor: pointer; }
+  .tlist li.sel { font-weight: 700; }
+  .tlist li.active, .tlist li:hover { background: var(--accent); color: var(--accent-text); }
+  button {
+    font: inherit; font-weight: 600; padding: 10px 18px; border-radius: 6px;
+    border: 1px solid var(--accent); background: var(--accent);
+    color: var(--accent-text); cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  button.small { padding: 4px 10px; font-size: 0.85rem; }
+  button.linkbtn {
+    border: 0; background: transparent; color: var(--accent); padding: 4px 0;
+    text-decoration: underline; font-weight: 500; font-size: 0.92rem;
+  }
+  #lang { font-size: 16px; padding: 3px 6px; white-space: nowrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .themewrap { position: relative; }
+  button.iconbtn { padding: 6px 9px; display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
+  #themeMenu {
+    position: absolute; right: 0; top: 100%; z-index: 20; margin: 4px 0 0; padding: 4px 0;
+    list-style: none; min-width: 210px; max-height: 70vh; overflow-y: auto;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  }
+  #themeMenu[hidden] { display: none; }
+  #themeMenu button {
+    display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: transparent;
+    color: var(--text); font-weight: 500; padding: 7px 14px;
+  }
+  #themeMenu button:hover, #themeMenu button:focus-visible { background: var(--accent); color: var(--accent-text); outline: none; }
+  #themeMenu button[aria-checked="true"] { font-weight: 700; }
+  #themeMenu button[aria-checked="true"]::before { content: "✓ "; }
+  #themeMenu button[aria-checked="false"]::before { content: "\00a0\00a0 "; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  button.tab[aria-selected="false"] { background: transparent; color: var(--accent); }
+  [role="tabpanel"][hidden] { display: none; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .msg { padding: 10px 12px; border-radius: 6px; margin-top: 14px; display: none; }
+  .msg.error { background: var(--error-bg); color: var(--error-text); display: block; }
+  .msg.ok { background: var(--ok-bg); display: block; }
+  .msg.info { display: block; background: var(--bg); color: var(--muted); border: 1px solid var(--border); font-size: 0.92rem; }
+  .note { display: none; color: var(--error-text); font-size: 0.85rem; margin-top: 4px; }
+  .note.show { display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; }
+  td.rm { width: 1%; text-align: right; white-space: nowrap; }
+  .reftag, .zid { color: var(--muted); font-size: 0.8rem; margin-left: 6px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  details.verify { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--border); }
+  details.verify summary, details.tpl summary { cursor: pointer; font-weight: 600; }
+  details.verify table { margin: 10px 0 6px; }
+  details.tpl { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .zoneadd { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .zoneadd input { flex: 1 1 200px; width: auto; }
+  dialog {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; width: calc(100% - 32px); max-width: 520px;
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  button.chip {
+    padding: 2px 8px; font-size: 0.85rem; font-weight: 500; background: transparent;
+    color: var(--accent); font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  p.hint { margin: 8px 0 10px; }
+  textarea[readonly], input[readonly] { background: var(--bg); }
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <h1 data-i18n="heading"></h1>
+    <div class="tools">
+      <div class="themewrap" id="themeWrap">
+        <button type="button" id="themeBtn" class="secondary iconbtn" aria-haspopup="menu" aria-expanded="false">
+          <svg id="iconSun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+          </svg>
+          <svg id="iconMoon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          </svg>
+        </button>
+        <ul id="themeMenu" role="menu" hidden></ul>
+      </div>
+      <button type="button" id="lang" class="secondary" aria-label="English / 日本語" title="English / 日本語">あA</button>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button type="button" class="tab" role="tab" id="tabEvents" aria-controls="panelEvents" aria-selected="true" data-i18n="tabEvents"></button>
+    <button type="button" class="tab" role="tab" id="tabEmail" aria-controls="panelEmail" aria-selected="false" tabindex="-1" data-i18n="tabEmail"></button>
+  </div>
+
+  <section id="panelEvents" role="tabpanel" aria-labelledby="tabEvents">
+    <form id="form" autocomplete="off" novalidate>
+      <div class="selbar">
+        <button type="button" class="linkbtn" id="selAll" data-i18n="selAll"></button>
+        <button type="button" class="linkbtn" id="selNone" data-i18n="selNone"></button>
+      </div>
+      <div id="events"></div>
+      <div class="actions" style="margin-top:0">
+        <button type="button" class="secondary" id="addEvent" data-i18n="btnAddEvent"></button>
+        <button type="button" class="secondary" id="importIcs" data-i18n="btnImport"></button>
+        <input type="file" id="icsFile" accept=".ics,text/calendar" hidden>
+      </div>
+      <div id="impMsg" class="msg" role="status"></div>
+      <fieldset class="filemode">
+        <legend data-i18n="fileModeLegend"></legend>
+        <label><input type="radio" name="fileMode" value="combined"> <span data-i18n="modeCombined"></span></label>
+        <label><input type="radio" name="fileMode" value="separate"> <span data-i18n="modeSeparate"></span></label>
+      </fieldset>
+      <p class="summary" id="dlSummary" aria-live="polite"></p>
+      <div class="actions">
+        <button type="submit" id="genBtn"></button>
+        <button type="button" class="secondary" id="clearBtn" data-i18n="btnClear"></button>
+      </div>
+      <div id="msg" class="msg" role="alert"></div>
+      <div id="fileList" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section id="panelEmail" role="tabpanel" aria-labelledby="tabEmail" hidden>
+    <div class="card">
+      <label for="genSubject" style="margin-top:0" data-i18n="genSubject"></label>
+      <input id="genSubject" type="text" readonly data-i18n-ph="phGenerated">
+      <div class="actions"><button type="button" class="secondary" data-copy="genSubject" data-i18n="btnCopySubject"></button></div>
+
+      <label for="genBody" data-i18n="genBody"></label>
+      <textarea id="genBody" rows="9" readonly data-i18n-ph="phGenerated"></textarea>
+      <div class="actions"><button type="button" class="secondary" data-copy="genBody" data-i18n="btnCopyBody"></button></div>
+
+      <details class="tpl">
+        <summary data-i18n="tplHeading"></summary>
+
+        <label for="tplSubject" data-i18n="tplSubject"></label>
+        <input id="tplSubject" class="tplfield" type="text" spellcheck="false">
+
+        <label for="tplIntro" data-i18n="tplIntro"></label>
+        <textarea id="tplIntro" class="tplfield" rows="2"></textarea>
+
+        <label for="tplLine" data-i18n="tplLine"></label>
+        <textarea id="tplLine" class="tplfield" rows="2"></textarea>
+
+        <label for="tplClosing" data-i18n="tplClosing"></label>
+        <textarea id="tplClosing" class="tplfield" rows="3"></textarea>
+
+        <div class="chips">
+          <span class="hint" data-i18n="tplInsert"></span>
+          <button type="button" class="chip" data-ph="{title}">{title}</button>
+          <button type="button" class="chip" data-ph="{date}">{date}</button>
+          <button type="button" class="chip" data-ph="{times}">{times}</button>
+          <button type="button" class="chip" data-ph="{end_times}">{end_times}</button>
+          <button type="button" class="chip" data-ph="{location}">{location}</button>
+        </div>
+        <p class="hint" data-i18n="tplHelp"></p>
+        <button type="button" class="secondary small" id="tplReset" data-i18n="tplReset"></button>
+      </details>
+    </div>
+  </section>
+
+  <dialog id="zoneDialog" aria-labelledby="zoneDialogTitle">
+    <h2 id="zoneDialogTitle" data-i18n="zonesDialogTitle"></h2>
+    <table><tbody id="zoneList"></tbody></table>
+    <div class="zoneadd">
+      <input id="zoneInput" type="text" list="tzlist" spellcheck="false" autocapitalize="off" data-i18n-ph="phZone">
+      <button type="button" class="secondary" id="zoneAdd" data-i18n="btnAddZone"></button>
+      <button type="button" class="secondary" id="zoneReset" data-i18n="btnRestoreZones"></button>
+    </div>
+    <div class="note" id="zoneNote"></div>
+    <div class="actions"><button type="button" id="zoneClose" data-i18n="btnClose"></button></div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden>
+    <span id="toastText"></span>
+    <button type="button" class="secondary small" id="toastUndo"></button>
+  </div>
+
+  <datalist id="tzlist"></datalist>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORE_KEY = "icsSettings";
+  var DEFAULT_REF = "Asia/Tokyo";
+  // Default verification list (IANA names). Edited lists are saved in the browser.
+  var DEFAULT_ZONES = ["Asia/Tokyo", "Asia/Taipei", "Europe/Paris"];
+  var SETTINGS_VERSION = 3; // v3: per-event time zones, three-part email template
+  // Default email templates. Placeholders: {title} {date} {times} {end_times} {location}
+  var DEFAULT_SUBJECT_TPL = "{title} – {date}";
+  var DEFAULT_INTRO_TPL = "Please find attached a calendar invite.";
+  var DEFAULT_LINE_TPL = "{title} on {date} at {times}.";
+  var DEFAULT_CLOSING_TPL =
+    "The file adjusts automatically to your local time.\n" +
+    "Just double-click the attached file to add it to your calendar.";
+  // Names used in the email text (English).
+  var EMAIL_NAMES = { "Asia/Tokyo": "Japan", "Asia/Taipei": "Taiwan", "Europe/Paris": "Paris" };
+  var ZNAMES = {
+    en: {
+      "Asia/Tokyo": "Tokyo", "Asia/Taipei": "Taipei", "UTC": "UTC", "Europe/London": "London",
+      "Europe/Paris": "Paris", "Europe/Berlin": "Central Europe", "America/New_York": "New York",
+      "America/Los_Angeles": "Los Angeles", "Asia/Kolkata": "India", "Australia/Sydney": "Sydney"
+    },
+    ja: {
+      "Asia/Tokyo": "東京", "Asia/Taipei": "台北", "UTC": "UTC", "Europe/London": "ロンドン",
+      "Europe/Paris": "パリ", "Europe/Berlin": "中央ヨーロッパ", "America/New_York": "ニューヨーク",
+      "America/Los_Angeles": "ロサンゼルス", "Asia/Kolkata": "インド", "Australia/Sydney": "シドニー"
+    }
+  };
+
+  var I18N = {
+    en: {
+      pageTitle: "Calendar Invite Generator",
+      heading: "Calendar Invite Generator",
+      tabEvents: "Events", tabEmail: "Email text",
+      eventN: "Event {n}",
+      btnAddEvent: "Add event", btnDeleteEvent: "Delete event", btnDuplicate: "Duplicate",
+      btnImport: "Import .ics file",
+      toastDeleted: "Event deleted.", btnUndo: "Undo",
+      fDuration: "Duration", d30: "30 min", d60: "1 h", d90: "1 h 30", d120: "2 h", d150: "2 h 30", d180: "3 h",
+      durLabel: "Duration: {d}",
+      eMidnight: "The end time must be on the same day as the start. This duration goes past midnight.",
+      impOne: "Imported 1 event from {name}.", impMany: "Imported {n} events from {name}.",
+      impNone: "No events found in this file.", impBig: "The file is too large (maximum 2 MB).",
+      impUtc: "Times in UTC were converted to the time zone {tz}.",
+      impAllDay: "All-day events are not supported; skipped: {n}.",
+      impNoStart: "Events without a valid start time; skipped: {n}.",
+      impRecur: "Recurrence rules are not supported; imported as single events: {n}.",
+      impEnd: "End time not imported (the event ends on another day): {n}.",
+      impRem: "Reminder not imported (unsupported value): {n}.",
+      impTz: "Unknown time zone ({tz}); the time zone {def} was applied. Check these events.",
+      impCap: "The limit of {max} events was reached; the remaining events were not imported.",
+      fTz: "Time zone", fTzHint: "(time zone name, e.g. Asia/Tokyo)",
+      fTitle: "Title", phTitle: "Team Meeting",
+      fDate: "Date", fStart: "Start", fEnd: "End",
+      pickDate: "Pick a date", pickTime: "Show times",
+      eTime: "Enter times in 24-hour format hh:mm (e.g. 10:35).",
+      fLocation: "Location / meeting link", fLocationHint: "(Webex, Zoom, Teams, etc.)",
+      fDesc: "Description", fDescHint: "(agenda, notes)",
+      fReminder: "Reminder",
+      rNone: "None", r15: "15 minutes before", r30: "30 minutes before", r60: "1 hour before", r1440: "1 day before",
+      btnClear: "Clear all",
+      fInclude: "Include in download", selAll: "Select all", selNone: "Select none",
+      fileModeLegend: "Files",
+      modeCombined: "One file with the selected events", modeSeparate: "One file per selected event",
+      genNone: "Generate .ics", genOne: "Generate 1 .ics file", genMany: "Generate {n} .ics files",
+      sumNone: "No event selected.",
+      sumOne: "Selected events: {sel} of {total} → 1 file: {names}",
+      sumMany: "Selected events: {sel} of {total} → {n} files: {names}",
+      filesReady: "Ready to download:", btnDownload: "Download",
+      verifyHeading: "Time in other zones",
+      btnModifyZones: "Modify time zones to check",
+      zonesDialogTitle: "Time zones to check",
+      thZone: "Zone", thTime: "Local time", refTag: "event zone",
+      phZone: "Add time zone (e.g. America/Chicago)",
+      btnAddZone: "Add", btnRestoreZones: "Restore default list", remove: "Remove", btnClose: "Close",
+      theme: "Theme", themeSystem: "Auto (system)", themeLight: "Light", themeDark: "Dark",
+      tplHeading: "Template",
+      tplSubject: "Subject", tplIntro: "Introduction (once)", tplLine: "Line per event", tplClosing: "Closing (once)",
+      tplInsert: "Insert placeholder:",
+      tplHelp: "{title}: title. {date}: date. {times}: start time in each zone. {end_times}: end time in each zone. {location}: location.",
+      tplReset: "Reset template",
+      genSubject: "Subject", genBody: "Message",
+      phGenerated: "Enter the date and start time of an event to generate the text.",
+      btnCopySubject: "Copy subject", btnCopyBody: "Copy message", copied: "Copied",
+      eRequired: "Title, date and start time are required.",
+      iNoEnd: "No end time set. The event will be added to calendars without an end time.",
+      eDate: "Enter the date as yyyy/mm/dd (e.g. 2026/10/07).",
+      eOrder: "End time must be later than start time.",
+      eGap: "This time does not exist in the time zone (daylight saving transition).",
+      eTz: "Unknown time zone: {tz}",
+      eDup: "This time zone is already in the list.",
+      moreSuffix: " (+{n} more)"
+    },
+    ja: {
+      pageTitle: "カレンダー招待ジェネレーター",
+      heading: "カレンダー招待ジェネレーター",
+      tabEvents: "イベント", tabEmail: "メール文面",
+      eventN: "イベント {n}",
+      btnAddEvent: "イベントを追加", btnDeleteEvent: "イベントを削除", btnDuplicate: "複製",
+      btnImport: ".ics ファイルを読み込む",
+      toastDeleted: "イベントを削除しました。", btnUndo: "元に戻す",
+      fDuration: "所要時間", d30: "30分", d60: "1時間", d90: "1時間30分", d120: "2時間", d150: "2時間30分", d180: "3時間",
+      durLabel: "所要時間: {d}",
+      eMidnight: "終了時刻は開始と同じ日にしてください。この所要時間は午前0時を過ぎます。",
+      impOne: "{name} から1件のイベントを読み込みました。", impMany: "{name} から{n}件のイベントを読み込みました。",
+      impNone: "このファイルにイベントが見つかりません。", impBig: "ファイルが大きすぎます(最大2 MB)。",
+      impUtc: "UTC の時刻をタイムゾーン {tz} に変換しました。",
+      impAllDay: "終日イベントは未対応のためスキップしました: {n}件。",
+      impNoStart: "有効な開始時刻がないイベントをスキップしました: {n}件。",
+      impRecur: "繰り返しルールは未対応のため、単発のイベントとして読み込みました: {n}件。",
+      impEnd: "終了時刻は読み込みませんでした(別の日に終了するイベント): {n}件。",
+      impRem: "リマインダーは読み込みませんでした(未対応の値): {n}件。",
+      impTz: "不明なタイムゾーン({tz})のため、タイムゾーン {def} を適用しました。内容を確認してください。",
+      impCap: "イベント数の上限({max}件)に達したため、残りは読み込みませんでした。",
+      fTz: "タイムゾーン", fTzHint: "(タイムゾーン名、例: Asia/Tokyo)",
+      fTitle: "タイトル", phTitle: "チームミーティング",
+      fDate: "日付", fStart: "開始", fEnd: "終了",
+      pickDate: "日付を選択", pickTime: "時刻の一覧",
+      eTime: "時刻は24時間表記の hh:mm 形式で入力してください(例: 10:35)。",
+      fLocation: "場所 / 会議リンク", fLocationHint: "(Webex、Zoom、Teams など)",
+      fDesc: "説明", fDescHint: "(アジェンダ、メモ)",
+      fReminder: "リマインダー",
+      rNone: "なし", r15: "15分前", r30: "30分前", r60: "1時間前", r1440: "1日前",
+      btnClear: "すべてクリア",
+      fInclude: "ダウンロードに含める", selAll: "すべて選択", selNone: "選択を解除",
+      fileModeLegend: "ファイル",
+      modeCombined: "選択したイベントを1つのファイルにまとめる", modeSeparate: "選択したイベントごとに1ファイル",
+      genNone: ".ics を生成", genOne: ".ics ファイルを1個生成", genMany: ".ics ファイルを{n}個生成",
+      sumNone: "イベントが選択されていません。",
+      sumOne: "選択中のイベント: {sel} / {total} → ファイル1個: {names}",
+      sumMany: "選択中のイベント: {sel} / {total} → ファイル{n}個: {names}",
+      filesReady: "ダウンロードの準備ができました:", btnDownload: "ダウンロード",
+      verifyHeading: "他のタイムゾーンでの時刻",
+      btnModifyZones: "確認するタイムゾーンを変更",
+      zonesDialogTitle: "確認するタイムゾーン",
+      thZone: "タイムゾーン", thTime: "現地時間", refTag: "イベントの時間帯",
+      phZone: "タイムゾーンを追加(例: America/Chicago)",
+      btnAddZone: "追加", btnRestoreZones: "初期リストに戻す", remove: "削除", btnClose: "閉じる",
+      theme: "テーマ", themeSystem: "自動(システム)", themeLight: "ライト", themeDark: "ダーク",
+      tplHeading: "テンプレート",
+      tplSubject: "件名", tplIntro: "冒頭(1回のみ)", tplLine: "イベントごとの行", tplClosing: "結び(1回のみ)",
+      tplInsert: "プレースホルダーを挿入:",
+      tplHelp: "{title}: タイトル。{date}: 日付。{times}: 各タイムゾーンでの開始時刻。{end_times}: 各タイムゾーンでの終了時刻。{location}: 場所。",
+      tplReset: "テンプレートを初期化",
+      genSubject: "件名", genBody: "本文",
+      phGenerated: "イベントの日付と開始時刻を入力すると文面が生成されます。",
+      btnCopySubject: "件名をコピー", btnCopyBody: "本文をコピー", copied: "コピーしました",
+      eRequired: "タイトル、日付、開始時刻は必須です。",
+      iNoEnd: "終了時刻が未設定です。終了時刻なしでカレンダーに追加されます。",
+      eDate: "日付は yyyy/mm/dd 形式で入力してください(例: 2026/10/07)。",
+      eOrder: "終了時刻は開始時刻より後にしてください。",
+      eGap: "この時刻はタイムゾーンに存在しません(夏時間の切り替え)。",
+      eTz: "不明なタイムゾーンです: {tz}",
+      eDup: "このタイムゾーンはすでにリストにあります。",
+      moreSuffix: "(他{n}件)"
+    }
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  function q(root, sel) { return root.querySelector(sel); }
+
+  // Some engines canonicalize aliases (e.g. Asia/Kolkata -> Asia/Calcutta); align defaults and names.
+  (function canonicalizeDefaults() {
+    function canon(v) {
+      try { return new Intl.DateTimeFormat("en-US", { timeZone: v }).resolvedOptions().timeZone; }
+      catch (e) { return v; }
+    }
+    DEFAULT_ZONES = DEFAULT_ZONES.map(canon);
+    DEFAULT_REF = canon(DEFAULT_REF);
+    ["en", "ja"].forEach(function (l) {
+      Object.keys(ZNAMES[l]).forEach(function (k) {
+        var c = canon(k);
+        if (c !== k) ZNAMES[l][c] = ZNAMES[l][k];
+      });
+    });
+  })();
+
+  var lang = "en";
+  var settings = null;   // {lang, theme, refTz, zones, templates}
+  var msgState = null;   // global message {key, kind, args}
+  var seq = 0;           // counter for unique element ids
+
+  function t(key, args) {
+    var s = I18N[lang][key];
+    if (args) Object.keys(args).forEach(function (k) { s = s.replace("{" + k + "}", args[k]); });
+    return s;
+  }
+  function pad2(n) { n = String(n); return n.length < 2 ? "0" + n : n; }
+
+  /* ---------- time zone helpers ---------- */
+
+  function canonTz(v) {
+    if (typeof v !== "string") return null;
+    v = v.trim();
+    if (!v) return null;
+    try { return new Intl.DateTimeFormat("en-US", { timeZone: v }).resolvedOptions().timeZone; }
+    catch (e) { return null; }
+  }
+
+  var dtfCache = {};
+  function numericFmt(tz) {
+    return dtfCache[tz] || (dtfCache[tz] = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric",
+      hour: "numeric", minute: "numeric", second: "numeric"
+    }));
+  }
+  // Offset (ms) of a zone from UTC at a given instant.
+  function tzOffsetMs(ms, tz) {
+    var p = {};
+    numericFmt(tz).formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    var asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, (+p.hour) % 24, +p.minute, +p.second);
+    return asUtc - Math.floor(ms / 1000) * 1000;
+  }
+  // Wall-clock time in a zone -> Date (instant). Returns null if the wall time does not exist (DST gap).
+  function zonedToUtc(d, tm, tz) {
+    var guess = Date.UTC(d[0], d[1] - 1, d[2], tm[0], tm[1], 0);
+    var u = guess - tzOffsetMs(guess, tz);
+    u = guess - tzOffsetMs(u, tz);
+    if (u + tzOffsetMs(u, tz) !== guess) return null;
+    return new Date(u);
+  }
+
+  // {date:"yyyy/mm/dd", wd, time:"hh:mm", tz:"GMT+9"} for an instant in a zone.
+  function zoneParts(date, tz, lc) {
+    var parts = new Intl.DateTimeFormat(lc === "ja" ? "ja-JP" : "en-GB", {
+      timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZoneName: "shortOffset"
+    }).formatToParts(date);
+    var p = {};
+    parts.forEach(function (x) { p[x.type] = x.value; });
+    return {
+      date: p.year + "/" + pad2(p.month) + "/" + pad2(p.day),
+      wd: p.weekday,
+      time: pad2(p.hour) + ":" + pad2(p.minute),
+      tz: p.timeZoneName
+    };
+  }
+
+  function zoneLabel(id) { return ZNAMES[lang][id] || id.replace(/_/g, " "); }
+
+  /* ---------- settings (localStorage) ---------- */
+
+  function loadSettings() {
+    var s = { v: SETTINGS_VERSION, lang: null, theme: "system", fileMode: "combined", refTz: DEFAULT_REF, zones: DEFAULT_ZONES.slice(),
+              subjectTpl: DEFAULT_SUBJECT_TPL, introTpl: DEFAULT_INTRO_TPL,
+              lineTpl: DEFAULT_LINE_TPL, closingTpl: DEFAULT_CLOSING_TPL };
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var o = JSON.parse(raw);
+        if (o.lang === "en" || o.lang === "ja") s.lang = o.lang;
+        if (typeof o.theme === "string" && isThemeId(o.theme)) s.theme = o.theme;
+        if (o.fileMode === "separate" || o.fileMode === "combined") s.fileMode = o.fileMode;
+        // The subject template carries over. The old single body template (bodyTpl) is discarded.
+        if (typeof o.subjectTpl === "string") s.subjectTpl = o.subjectTpl.slice(0, 1000);
+        if (typeof o.introTpl === "string") s.introTpl = o.introTpl.slice(0, 2000);
+        if (typeof o.lineTpl === "string") s.lineTpl = o.lineTpl.slice(0, 2000);
+        if (typeof o.closingTpl === "string") s.closingTpl = o.closingTpl.slice(0, 2000);
+        var r = canonTz(o.refTz);
+        if (r) s.refTz = r;
+        // Zone lists saved by versions older than 2 are discarded in favor of the current defaults.
+        if (o.v >= 2 && Array.isArray(o.zones)) {
+          var seen = {};
+          s.zones = [];
+          o.zones.forEach(function (z) {
+            var c = canonTz(z);
+            if (c && !seen[c]) { seen[c] = 1; s.zones.push(c); }
+          });
+        }
+      } else {
+        var old = localStorage.getItem("icsLang");
+        if (old === "en" || old === "ja") s.lang = old;
+      }
+    } catch (e) {}
+    if (!s.lang) s.lang = /^ja\b/i.test(navigator.language || "") ? "ja" : "en";
+    return s;
+  }
+  function saveSettings() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+
+  /* ---------- parsing and input formatting ---------- */
+
+  function normDate(s) {
+    var m = /^\s*(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\s*$/.exec(s);
+    return m ? m[1] + "/" + pad2(m[2]) + "/" + pad2(m[3]) : null;
+  }
+  function fmtDateDigits(raw) {
+    var d = raw.replace(/\D/g, "").slice(0, 8);
+    var out = d.slice(0, 4);
+    if (d.length > 4) out += "/" + d.slice(4, 6);
+    if (d.length > 6) out += "/" + d.slice(6, 8);
+    return out;
+  }
+  function parseDate(s) {
+    var m = /^(\d{4})\/(\d{2})\/(\d{2})$/.exec(s);
+    if (!m) return null;
+    var y = +m[1], mo = +m[2], d = +m[3];
+    var chk = new Date(Date.UTC(y, mo - 1, d));
+    if (chk.getUTCFullYear() !== y || chk.getUTCMonth() !== mo - 1 || chk.getUTCDate() !== d) return null;
+    return [y, mo, d];
+  }
+  function normTime(s) {
+    var m = /^\s*(\d{1,2})[:：.](\d{2})\s*$/.exec(s);
+    return m ? pad2(m[1]) + ":" + m[2] : null;
+  }
+  // Positional formatting while typing digits ("930" -> "9:30", "1035" -> "10:35").
+  function fmtTimeDigits(raw) {
+    var d = raw.replace(/\D/g, "").slice(0, 4);
+    if (!d) return "";
+    var hl = d.charAt(0) > "2" ? 1 : 2;
+    if (d.length <= hl) return d;
+    return d.slice(0, hl) + ":" + d.slice(hl, hl + 2);
+  }
+  function parseTime(s) {
+    var m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(s);
+    return m ? [+m[1], +m[2]] : null;
+  }
+
+  /* ---------- event cards ---------- */
+
+  function cards() { return Array.prototype.slice.call($("events").children); }
+
+  // Event data is saved in the browser on every change and restored on load.
+  // "Clear all" is the only action that removes it.
+  var EVENTS_KEY = "icsEvents";
+  var MAX_EVENTS = 50;
+  // Plain data of one card (used for saving, duplicating, undoing a deletion).
+  function readCard(card) {
+    return {
+      sel: q(card, ".f-sel").checked,
+      tz: card.dataset.tz,
+      title: q(card, ".f-title").value,
+      date: q(card, ".f-date").value,
+      start: q(card, ".f-start").value,
+      end: q(card, ".f-end").value,
+      location: q(card, ".f-location").value,
+      description: q(card, ".f-description").value,
+      reminder: q(card, ".f-reminder").value
+    };
+  }
+  function saveEvents() {
+    try {
+      localStorage.setItem(EVENTS_KEY, JSON.stringify({ v: 1, events: cards().map(readCard) }));
+    } catch (e) {}
+  }
+  // Creates a card from event data at the given position (appended when index is omitted).
+  function restoreCard(ev, index) {
+    function s(v, n) { return typeof v === "string" ? v.slice(0, n) : ""; }
+    var card = addCard(canonTz(ev.tz) || settings.refTz, index);
+    q(card, ".f-sel").checked = ev.sel !== false; // events are selected unless saved as not selected
+    q(card, ".f-title").value = s(ev.title, 500);
+    q(card, ".f-date").value = s(ev.date, 10);
+    q(card, ".f-start").value = s(ev.start, 5);
+    q(card, ".f-end").value = s(ev.end, 5);
+    q(card, ".f-location").value = s(ev.location, 2000);
+    q(card, ".f-description").value = s(ev.description, 10000);
+    var r = s(ev.reminder, 5);
+    if (["", "15", "30", "60", "1440"].indexOf(r) >= 0) q(card, ".f-reminder").value = r;
+    return card;
+  }
+  function restoreEvents() {
+    var list = [];
+    try {
+      var o = JSON.parse(localStorage.getItem(EVENTS_KEY) || "null");
+      if (o && Array.isArray(o.events)) list = o.events.slice(0, MAX_EVENTS);
+    } catch (e) {}
+    list.forEach(function (ev) {
+      if (ev && typeof ev === "object") restoreCard(ev);
+    });
+    if (!cards().length) addCard(settings.refTz);
+  }
+
+  // Reads one card and computes its instants in the card's own time zone.
+  function compute(card) {
+    var tz = card.dataset.tz;
+    var r = { tz: tz, d: null, start: null, end: null, orderErr: false, gapErr: false };
+    var ds = q(card, ".f-date").value;
+    r.d = parseDate(normDate(ds) || ds.trim());
+    var ts = parseTime(q(card, ".f-start").value), te = parseTime(q(card, ".f-end").value);
+    if (!r.d) return r;
+    if (ts) {
+      r.start = zonedToUtc(r.d, ts, tz);
+      if (!r.start) r.gapErr = true;
+    }
+    if (te) {
+      r.end = zonedToUtc(r.d, te, tz);
+      if (!r.end) r.gapErr = true;
+    }
+    if (r.start && r.end && r.end <= r.start) { r.orderErr = true; r.end = null; }
+    return r;
+  }
+
+  function cardHtml(n) {
+    return '' +
+      '<div class="cardhead"><div class="headleft"><h2 class="evtitle"></h2>' +
+      '<label class="selwrap"><input type="checkbox" class="f-sel" checked> <span data-i18n="fInclude"></span></label></div>' +
+      '<div class="cardbtns">' +
+        '<button type="button" class="secondary small dup" data-i18n="btnDuplicate"></button>' +
+        '<button type="button" class="secondary small del" data-i18n="btnDeleteEvent"></button>' +
+      '</div></div>' +
+
+      '<label for="title' + n + '" style="margin-top:0" data-i18n="fTitle"></label>' +
+      '<input id="title' + n + '" class="f-title" type="text" data-i18n-ph="phTitle">' +
+
+      '<div class="row">' +
+        '<div><label for="tz' + n + '"><span data-i18n="fTz"></span> <span class="hint" data-i18n="fTzHint"></span></label>' +
+          '<input id="tz' + n + '" class="f-tz" type="text" list="tzlist" spellcheck="false" autocapitalize="off"></div>' +
+        '<div><label for="date' + n + '" data-i18n="fDate"></label>' +
+          '<div class="datewrap">' +
+            '<input id="date' + n + '" class="date f-date" type="text" inputmode="numeric" maxlength="10" placeholder="yyyy/mm/dd">' +
+            '<button type="button" class="pick" data-i18n-title="pickDate" aria-label="Calendar">📅</button>' +
+            '<input class="native f-datepicker" type="date" tabindex="-1" aria-hidden="true">' +
+          '</div></div>' +
+        '<div><label for="start' + n + '" data-i18n="fStart"></label>' +
+          '<div class="timewrap">' +
+            '<input id="start' + n + '" class="time f-start" type="text" inputmode="numeric" maxlength="5" placeholder="hh:mm" ' +
+              'role="combobox" aria-autocomplete="none" aria-expanded="false" aria-controls="startList' + n + '">' +
+            '<button type="button" class="tbtn" tabindex="-1" data-i18n-title="pickTime" aria-label="Times">▾</button>' +
+            '<ul id="startList' + n + '" class="tlist" role="listbox" hidden></ul>' +
+          '</div></div>' +
+        '<div><label for="end' + n + '" data-i18n="fEnd"></label>' +
+          '<div class="timewrap">' +
+            '<input id="end' + n + '" class="time f-end" type="text" inputmode="numeric" maxlength="5" placeholder="hh:mm" ' +
+              'role="combobox" aria-autocomplete="none" aria-expanded="false" aria-controls="endList' + n + '">' +
+            '<button type="button" class="tbtn" tabindex="-1" data-i18n-title="pickTime" aria-label="Times">▾</button>' +
+            '<ul id="endList' + n + '" class="tlist" role="listbox" hidden></ul>' +
+            '<div class="durtext" aria-live="polite"></div>' +
+          '</div></div>' +
+      '</div>' +
+      '<div class="durrow"><span class="hint" data-i18n="fDuration"></span>' +
+        '<button type="button" class="secondary small dur" data-min="30" data-i18n="d30"></button>' +
+        '<button type="button" class="secondary small dur" data-min="60" data-i18n="d60"></button>' +
+        '<button type="button" class="secondary small dur" data-min="90" data-i18n="d90"></button>' +
+        '<button type="button" class="secondary small dur" data-min="120" data-i18n="d120"></button>' +
+        '<button type="button" class="secondary small dur" data-min="150" data-i18n="d150"></button>' +
+        '<button type="button" class="secondary small dur" data-min="180" data-i18n="d180"></button>' +
+      '</div>' +
+      '<div class="note tznote"></div>' +
+
+      '<label for="location' + n + '"><span data-i18n="fLocation"></span> <span class="hint" data-i18n="fLocationHint"></span></label>' +
+      '<input id="location' + n + '" class="f-location" type="text" placeholder="https://...">' +
+
+      '<label for="description' + n + '"><span data-i18n="fDesc"></span> <span class="hint" data-i18n="fDescHint"></span></label>' +
+      '<textarea id="description' + n + '" class="f-description"></textarea>' +
+
+      '<label for="reminder' + n + '" data-i18n="fReminder"></label>' +
+      '<select id="reminder' + n + '" class="f-reminder">' +
+        '<option value="" data-i18n="rNone"></option>' +
+        '<option value="15" data-i18n="r15"></option>' +
+        '<option value="30" data-i18n="r30"></option>' +
+        '<option value="60" data-i18n="r60"></option>' +
+        '<option value="1440" data-i18n="r1440"></option>' +
+      '</select>' +
+
+      '<div class="msg cardmsg" role="alert"></div>' +
+
+      '<details class="verify"><summary data-i18n="verifyHeading"></summary>' +
+        '<table><thead><tr><th data-i18n="thZone"></th><th data-i18n="thTime"></th></tr></thead>' +
+        '<tbody class="vbody"></tbody></table>' +
+        '<button type="button" class="linkbtn modzones" data-i18n="btnModifyZones"></button>' +
+      '</details>';
+  }
+
+  // Adds a card at the given position (appended when index is omitted).
+  function addCard(tz, index) {
+    var n = ++seq;
+    var card = document.createElement("section");
+    card.className = "card evcard";
+    card.innerHTML = cardHtml(n);
+    card.dataset.tz = tz;
+    var ref = typeof index === "number" ? cards()[index] : null;
+    $("events").insertBefore(card, ref || null);
+    translate(card);
+    q(card, ".f-tz").value = tz;
+    wireCard(card);
+    numberCards();
+    return card;
+  }
+
+  function numberCards() {
+    var all = cards(), full = all.length >= MAX_EVENTS;
+    all.forEach(function (card, i) {
+      q(card, ".evtitle").textContent = t("eventN", { n: i + 1 });
+      q(card, ".del").style.display = i === 0 ? "none" : "";
+      q(card, ".dup").disabled = full;
+    });
+    $("addEvent").disabled = full;
+  }
+
+  function wireCard(card) {
+    var dateEl = q(card, ".f-date");
+    function upd() { update(card); }
+
+    // Date
+    dateEl.addEventListener("input", function () { dateEl.value = fmtDateDigits(dateEl.value); upd(); });
+    dateEl.addEventListener("blur", function () {
+      var n = normDate(dateEl.value);
+      if (n) { dateEl.value = n; upd(); }
+    });
+    dateEl.addEventListener("paste", function (e) {
+      var text = (e.clipboardData || window.clipboardData).getData("text");
+      e.preventDefault();
+      dateEl.value = normDate(text) || fmtDateDigits(text);
+      upd();
+    });
+    q(card, ".pick").addEventListener("click", function () {
+      var p = q(card, ".f-datepicker");
+      var cur = parseDate(dateEl.value);
+      p.value = cur ? cur[0] + "-" + pad2(cur[1]) + "-" + pad2(cur[2]) : "";
+      try { p.showPicker(); } catch (e) { try { p.focus(); p.click(); } catch (e2) {} }
+    });
+    q(card, ".f-datepicker").addEventListener("change", function () {
+      var v = q(card, ".f-datepicker").value;
+      if (v) { dateEl.value = v.replace(/-/g, "/"); upd(); }
+    });
+
+    // Times
+    ["start", "end"].forEach(function (which) {
+      var input = q(card, ".f-" + which);
+      buildTimeCombo(input, input.parentNode.querySelector(".tlist"), input.parentNode.querySelector(".tbtn"), upd);
+    });
+
+    // Text fields and reminder do not change any time: refresh the email text, saved data and file summary.
+    function textChanged() { renderEmail(); saveEvents(); renderGenUi(); }
+    q(card, ".f-title").addEventListener("input", textChanged);
+    q(card, ".f-location").addEventListener("input", textChanged);
+    q(card, ".f-description").addEventListener("input", textChanged);
+    q(card, ".f-reminder").addEventListener("change", textChanged);
+
+    // Time zone
+    var tzEl = q(card, ".f-tz");
+    tzEl.addEventListener("change", function () { commitTz(card); });
+    tzEl.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); commitTz(card); }
+    });
+
+    // Duration buttons set the end time from the start time (same day only).
+    Array.prototype.forEach.call(card.querySelectorAll(".dur"), function (b) {
+      b.addEventListener("click", function () {
+        var sEl = q(card, ".f-start");
+        var st = parseTime(normTime(sEl.value) || sEl.value.trim());
+        if (!st) { sEl.focus(); return; }
+        var total = st[0] * 60 + st[1] + (+b.getAttribute("data-min"));
+        if (total >= 1440) {
+          card._msg = { key: "eMidnight", kind: "error" };
+          renderCardMsg(card);
+          return;
+        }
+        sEl.value = pad2(st[0]) + ":" + pad2(st[1]);
+        q(card, ".f-end").value = pad2(Math.floor(total / 60)) + ":" + pad2(total % 60);
+        update(card);
+      });
+    });
+
+    // Selection for download
+    q(card, ".f-sel").addEventListener("change", renderOutput);
+
+    // Duplicate: a copy of all fields directly below this event (always selected).
+    q(card, ".dup").addEventListener("click", function () {
+      if (cards().length >= MAX_EVENTS) return;
+      var data = readCard(card);
+      data.sel = true;
+      var copy = restoreCard(data, cards().indexOf(card) + 1);
+      msgState = null; renderMsg();
+      update(copy);
+      q(copy, ".f-title").focus();
+      if (copy.scrollIntoView) copy.scrollIntoView({ block: "nearest" });
+    });
+
+    // Delete (with undo) and zone dialog
+    q(card, ".del").addEventListener("click", function () {
+      var state = { ev: readCard(card), index: cards().indexOf(card) };
+      card.parentNode.removeChild(card);
+      numberCards();
+      msgState = null; renderMsg();
+      renderOutput();
+      showToast(state);
+    });
+    q(card, ".modzones").addEventListener("click", openZoneDialog);
+  }
+
+  function commitTz(card) {
+    var el = q(card, ".f-tz"), note = q(card, ".tznote");
+    var c = canonTz(el.value);
+    if (!c) {
+      setNote(note, "eTz", { tz: el.value.trim() });
+      el.value = card.dataset.tz;
+      return;
+    }
+    setNote(note, null);
+    el.value = c;
+    if (c !== card.dataset.tz) {
+      card.dataset.tz = c;
+      settings.refTz = c; // last-used zone becomes the default for the first event next time
+      saveSettings();
+      update(card);
+    }
+  }
+
+  /* ---------- editable time field with drop-down ---------- */
+
+  // Time list 08:00-19:00 every 30 minutes; the text can be typed or edited freely.
+  function buildTimeCombo(input, list, btn, onChange) {
+    var items = [], active = -1;
+    for (var m = 8 * 60; m <= 19 * 60; m += 30) {
+      var li = document.createElement("li");
+      li.setAttribute("role", "option");
+      li.textContent = pad2(Math.floor(m / 60)) + ":" + pad2(m % 60);
+      list.appendChild(li);
+      items.push(li);
+    }
+    function mark() {
+      items.forEach(function (li, i) {
+        li.className = (i === active ? "active " : "") + (li.textContent === input.value ? "sel" : "");
+        li.setAttribute("aria-selected", li.textContent === input.value ? "true" : "false");
+      });
+    }
+    function isOpen() { return !list.hidden; }
+    function setOpen(open) {
+      list.hidden = !open;
+      input.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        active = -1;
+        items.forEach(function (li, i) { if (li.textContent === input.value) active = i; });
+        mark();
+        var target = active >= 0 ? items[active] : items[0];
+        list.scrollTop = Math.max(0, target.offsetTop - 60);
+      } else {
+        active = -1;
+        mark();
+      }
+    }
+    function pick(v) { input.value = v; setOpen(false); onChange(); }
+
+    items.forEach(function (li) { li.addEventListener("click", function () { pick(li.textContent); }); });
+    list.addEventListener("mousedown", function (e) { e.preventDefault(); }); // keep focus in the input
+    btn.addEventListener("click", function () { setOpen(!isOpen()); input.focus(); });
+    input.addEventListener("input", function () {
+      input.value = fmtTimeDigits(input.value);
+      if (isOpen()) { active = -1; mark(); }
+      onChange();
+    });
+    input.addEventListener("blur", function () {
+      var n = normTime(input.value);
+      if (n) { input.value = n; onChange(); }
+    });
+    input.addEventListener("paste", function (e) {
+      var text = (e.clipboardData || window.clipboardData).getData("text");
+      e.preventDefault();
+      input.value = normTime(text) || fmtTimeDigits(text);
+      onChange();
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (!isOpen()) { setOpen(true); return; }
+        var step = e.key === "ArrowDown" ? 1 : -1;
+        active = active < 0 ? (step > 0 ? 0 : items.length - 1) : (active + step + items.length) % items.length;
+        mark();
+        if (items[active].scrollIntoView) items[active].scrollIntoView({ block: "nearest" });
+      } else if (e.key === "Enter" && isOpen() && active >= 0) {
+        e.preventDefault();
+        pick(items[active].textContent);
+      } else if (e.key === "Escape" && isOpen()) {
+        e.preventDefault();
+        setOpen(false);
+      } else if (e.key === "Tab") {
+        setOpen(false);
+      }
+    });
+  }
+  // One document-level handler closes every open time list when clicking elsewhere.
+  document.addEventListener("mousedown", function (e) {
+    Array.prototype.forEach.call(document.querySelectorAll(".tlist:not([hidden])"), function (list) {
+      if (!list.parentNode.contains(e.target)) {
+        list.hidden = true;
+        var inp = list.parentNode.querySelector("input");
+        if (inp) inp.setAttribute("aria-expanded", "false");
+      }
+    });
+  });
+
+  /* ---------- ICS generation ---------- */
+
+  function toIcsUtc(date) {
+    return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  }
+  function escapeText(s) {
+    return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  }
+  // Fold lines to 75 octets (UTF-8) per RFC 5545, without splitting characters.
+  function fold(line) {
+    var enc = new TextEncoder();
+    if (enc.encode(line).length <= 75) return line;
+    var out = [], cur = "", bytes = 0;
+    for (var ch of line) {
+      var b = enc.encode(ch).length;
+      if (bytes + b > 75) { out.push(cur); cur = " " + ch; bytes = 1 + b; }
+      else { cur += ch; bytes += b; }
+    }
+    out.push(cur);
+    return out.join("\r\n");
+  }
+  function uid() {
+    var r = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
+    return r + "@ics-generator";
+  }
+  // One VCALENDAR containing one VEVENT per event.
+  function buildIcs(evs) {
+    var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ICS Generator//EN", "CALSCALE:GREGORIAN"];
+    var stamp = toIcsUtc(new Date());
+    evs.forEach(function (ev) {
+      lines.push("BEGIN:VEVENT",
+        "UID:" + uid(),
+        "DTSTAMP:" + stamp,
+        "DTSTART:" + toIcsUtc(ev.start));
+      // No end time set: DTEND equals DTSTART (zero duration). DTEND is optional in RFC 5545,
+      // but Outlook rejects files without it, so it is written explicitly.
+      lines.push("DTEND:" + toIcsUtc(ev.end || ev.start));
+      lines.push("SUMMARY:" + escapeText(ev.title));
+      if (ev.location) {
+        lines.push("LOCATION:" + escapeText(ev.location));
+        if (/^https?:\/\//i.test(ev.location)) lines.push("URL:" + ev.location);
+      }
+      if (ev.description) lines.push("DESCRIPTION:" + escapeText(ev.description));
+      lines.push("STATUS:CONFIRMED", "TRANSP:OPAQUE");
+      if (ev.reminder) {
+        lines.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + escapeText(ev.title),
+          "TRIGGER:-PT" + ev.reminder + "M", "END:VALARM");
+      }
+      lines.push("END:VEVENT");
+    });
+    lines.push("END:VCALENDAR");
+    return lines.map(fold).join("\r\n") + "\r\n";
+  }
+  // One event: {title}_{date}.ics. Several events: {first title}_{first date}_plus{N}.ics.
+  function fileName(title, dateStr, extra) {
+    var slug = title.trim().replace(/[^\w\-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "meeting";
+    return slug + (dateStr ? "_" + dateStr.replace(/\//g, "-") : "") + (extra > 0 ? "_plus" + extra : "") + ".ics";
+  }
+  function download(name, content) {
+    var blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  /* ---------- messages and notes ---------- */
+
+  function renderMsg() {
+    var m = $("msg");
+    if (!msgState) { m.textContent = ""; m.className = "msg"; return; }
+    m.textContent = t(msgState.key, msgState.args);
+    m.className = "msg " + msgState.kind;
+  }
+  function showMsg(key, kind, args) { msgState = { key: key, kind: kind, args: args }; renderMsg(); }
+
+  // Undo notice after deleting an event (one level, disappears after a few seconds).
+  var toastState = null, toastTimer = null;
+  function renderToast() {
+    var el = $("toast");
+    if (!toastState) { el.hidden = true; return; }
+    $("toastText").textContent = t("toastDeleted");
+    $("toastUndo").textContent = t("btnUndo");
+    el.hidden = false;
+  }
+  function hideToast() { clearTimeout(toastTimer); toastState = null; renderToast(); }
+  function showToast(state) {
+    clearTimeout(toastTimer);
+    toastState = state;
+    renderToast();
+    toastTimer = setTimeout(hideToast, 8000);
+  }
+  $("toastUndo").addEventListener("click", function () {
+    var s = toastState;
+    hideToast();
+    if (!s || cards().length >= MAX_EVENTS) return;
+    var card = restoreCard(s.ev, s.index);
+    msgState = null; renderMsg();
+    update(card);
+    if (card.scrollIntoView) card.scrollIntoView({ block: "nearest" });
+  });
+
+  // Result of the last .ics import: {kind, lines:[{key,args}]}.
+  var impState = null;
+  function renderImpMsg() {
+    var el = $("impMsg");
+    if (!impState) { el.textContent = ""; el.className = "msg"; return; }
+    el.textContent = impState.lines.map(function (l) { return t(l.key, l.args); }).join("\n");
+    el.className = "msg " + impState.kind;
+  }
+
+  /* ---------- files to download ---------- */
+
+  var generated = null; // {sig, files:[{name, content, titles}]} from the last "Generate"
+  function selectedCards() {
+    return cards().filter(function (c) { return q(c, ".f-sel").checked; });
+  }
+  // Signature of everything that goes into the files; a changed signature invalidates the file list.
+  function genSig() { return JSON.stringify([settings.fileMode, cards().map(readCard)]); }
+  // "name.ics", "name.ics" -> "name.ics", "name_2.ics"
+  function uniqueNames(names) {
+    var seen = {};
+    return names.map(function (n) {
+      var base = n.replace(/\.ics$/, ""), cand = n, i = 1;
+      while (seen[cand.toLowerCase()]) { i++; cand = base + "_" + i + ".ics"; }
+      seen[cand.toLowerCase()] = 1;
+      return cand;
+    });
+  }
+  // File names planned for the selected events, from the current field values.
+  function plannedNames(sel) {
+    if (!sel.length) return [];
+    function parts(card) {
+      var d = normDate(q(card, ".f-date").value) || q(card, ".f-date").value.trim();
+      return { title: q(card, ".f-title").value, date: parseDate(d) ? d : "" };
+    }
+    if (settings.fileMode === "separate") {
+      return uniqueNames(sel.map(function (c) { var p = parts(c); return fileName(p.title, p.date, 0); }));
+    }
+    var p = parts(sel[0]);
+    return [fileName(p.title, p.date, sel.length - 1)];
+  }
+
+  function renderFileList() {
+    var box = $("fileList");
+    box.innerHTML = "";
+    box.className = generated ? "card filelist" : "";
+    if (!generated) return;
+    var head = document.createElement("div");
+    head.className = "fileready";
+    head.textContent = t("filesReady");
+    box.appendChild(head);
+    generated.files.forEach(function (f) {
+      var row = document.createElement("div"), info = document.createElement("div");
+      var name = document.createElement("strong"), titles = document.createElement("span"), btn = document.createElement("button");
+      row.className = "fileitem"; info.className = "fileinfo";
+      name.textContent = f.name;
+      titles.className = "hint";
+      titles.textContent = f.titles.join(", ");
+      info.appendChild(name); info.appendChild(titles);
+      btn.type = "button"; btn.className = "secondary small";
+      btn.textContent = t("btnDownload");
+      btn.addEventListener("click", function () { download(f.name, f.content); });
+      row.appendChild(info); row.appendChild(btn);
+      box.appendChild(row);
+    });
+  }
+
+  // Summary line, Generate button label, file layout choice, excluded-event styling and file list.
+  function renderGenUi() {
+    var all = cards(), sel = selectedCards(), names = plannedNames(sel);
+    all.forEach(function (c) { c.classList.toggle("excluded", !q(c, ".f-sel").checked); });
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="fileMode"]'), function (r) {
+      r.checked = r.value === settings.fileMode;
+    });
+    var btn = $("genBtn");
+    btn.disabled = !sel.length;
+    btn.textContent = !sel.length ? t("genNone") : names.length === 1 ? t("genOne") : t("genMany", { n: names.length });
+    var shown = names.length > 3 ? names.slice(0, 3).join(", ") + ", …" : names.join(", ");
+    $("dlSummary").textContent = !sel.length ? t("sumNone")
+      : t(names.length === 1 ? "sumOne" : "sumMany", { sel: sel.length, total: all.length, n: names.length, names: shown });
+    if (generated && generated.sig !== genSig()) generated = null; // data changed after generating
+    renderFileList();
+  }
+
+  /* ---------- .ics import ---------- */
+
+  function icsUnescape(s) {
+    return s.replace(/\\([nN,;\\])/g, function (m, c) { return c === "n" || c === "N" ? "\n" : c; });
+  }
+  // Splits "NAME;PARAM=x:value" at the first colon outside double quotes.
+  function icsSplit(line) {
+    var inQuote = false, i, ch;
+    for (i = 0; i < line.length; i++) {
+      ch = line.charAt(i);
+      if (ch === '"') inQuote = !inQuote;
+      else if (ch === ":" && !inQuote) break;
+    }
+    if (i >= line.length) return null;
+    var head = line.slice(0, i), parts = [], cur = "", inQ2 = false;
+    for (var j = 0; j < head.length; j++) {
+      ch = head.charAt(j);
+      if (ch === '"') inQ2 = !inQ2;
+      if (ch === ";" && !inQ2) { parts.push(cur); cur = ""; } else cur += ch;
+    }
+    parts.push(cur);
+    var params = {};
+    parts.slice(1).forEach(function (p) {
+      var k = p.indexOf("=");
+      if (k > 0) params[p.slice(0, k).toUpperCase()] = p.slice(k + 1).replace(/^"|"$/g, "");
+    });
+    return { name: parts[0].toUpperCase(), params: params, value: line.slice(i + 1) };
+  }
+  // DTSTART/DTEND value -> {allDay} or {date:"yyyy/mm/dd", time:"hh:mm", utc, tzid, ms}; null when invalid.
+  function icsMoment(p) {
+    var m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(?:\d{2})?(Z)?)?$/i.exec(p.value.trim());
+    if (!m) return null;
+    var date = m[1] + "/" + m[2] + "/" + m[3];
+    if (!parseDate(date)) return null;
+    if (m[4] === undefined) return { allDay: true };
+    if (+m[4] > 23 || +m[5] > 59) return null;
+    return {
+      date: date, time: m[4] + ":" + m[5], utc: !!m[6], tzid: p.params.TZID || null,
+      ms: m[6] ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null
+    };
+  }
+  // Wall-clock date and time of a moment in the given zone (UTC moments are converted; others taken as given).
+  function momentIn(mo, tz) {
+    if (mo.utc) {
+      var z = zoneParts(new Date(mo.ms), tz, "en");
+      return { date: z.date, time: z.time };
+    }
+    return { date: mo.date, time: mo.time };
+  }
+  // ISO 8601 duration -> {sign, min}; null when not a duration.
+  function icsDuration(s) {
+    var m = /^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:\d+S)?)?$/i.exec(s.trim());
+    if (!m) return null;
+    return { sign: m[1] === "-" ? -1 : 1,
+             min: (+m[2] || 0) * 10080 + (+m[3] || 0) * 1440 + (+m[4] || 0) * 60 + (+m[5] || 0) };
+  }
+  // TZID values: IANA names, also with a prefix such as "/mozilla.org/20050126_1/Europe/Paris".
+  function resolveIcsTz(tzid) {
+    var c = canonTz(tzid);
+    if (c) return c;
+    var m = /([A-Za-z]+\/[A-Za-z_\-+0-9]+(?:\/[A-Za-z_\-+0-9]+)?)$/.exec(tzid);
+    return m ? canonTz(m[1]) : null;
+  }
+
+  // Reads the VEVENTs of an .ics text into card data. Times in UTC or without a known time zone
+  // are shown in defaultTz. Unsupported content is counted in stats.
+  function parseIcs(text, defaultTz) {
+    var lines = text.replace(/\r\n|\r/g, "\n").replace(/\n[ \t]/g, "").split("\n");
+    var raw = [], cur = null, inAlarm = false;
+    lines.forEach(function (line) {
+      if (!line) return;
+      var u = line.trim().toUpperCase();
+      if (u === "BEGIN:VEVENT") { cur = { props: {}, trigger: null }; inAlarm = false; return; }
+      if (!cur) return;
+      if (u === "END:VEVENT") { raw.push(cur); cur = null; return; }
+      if (u === "BEGIN:VALARM") { inAlarm = true; return; }
+      if (u === "END:VALARM") { inAlarm = false; return; }
+      var p = icsSplit(line);
+      if (!p) return;
+      if (inAlarm) { if (p.name === "TRIGGER" && !cur.trigger) cur.trigger = p; return; }
+      if (cur.props[p.name] === undefined) cur.props[p.name] = p;
+    });
+
+    var stats = { allDay: 0, noStart: 0, recur: 0, endDropped: 0, remDropped: 0, badTz: [], utc: false };
+    var events = [];
+    function oneLine(s) { return s.replace(/\s*\n\s*/g, " ").trim(); }
+    raw.forEach(function (e) {
+      var P = e.props;
+      var s = P.DTSTART ? icsMoment(P.DTSTART) : null;
+      if (!s) { stats.noStart++; return; }
+      if (s.allDay) { stats.allDay++; return; }
+      var tz = defaultTz;
+      if (s.tzid) {
+        var rz = resolveIcsTz(s.tzid);
+        if (rz) tz = rz;
+        else if (stats.badTz.indexOf(s.tzid) < 0) stats.badTz.push(s.tzid);
+      }
+      if (s.utc) stats.utc = true;
+      var st = momentIn(s, tz), endTime = "";
+      var en = P.DTEND ? icsMoment(P.DTEND) : null;
+      if (en && !en.allDay) {
+        var ew = momentIn(en, tz);
+        if (ew.date !== st.date || ew.time < st.time) stats.endDropped++;
+        else if (ew.time > st.time) endTime = ew.time; // equal times = no end time
+      } else if (!en && P.DURATION) {
+        var d = icsDuration(P.DURATION.value);
+        if (d && d.sign > 0 && d.min > 0) {
+          var tot = +st.time.slice(0, 2) * 60 + +st.time.slice(3) + d.min;
+          if (tot < 1440) endTime = pad2(Math.floor(tot / 60)) + ":" + pad2(tot % 60);
+          else stats.endDropped++;
+        }
+      }
+      var rem = "";
+      if (e.trigger) {
+        var d2 = icsDuration(e.trigger.value);
+        var related = (e.trigger.params.RELATED || "START").toUpperCase();
+        if (d2 && d2.sign < 0 && related === "START" && [15, 30, 60, 1440].indexOf(d2.min) >= 0) rem = String(d2.min);
+        else stats.remDropped++;
+      }
+      if (P.RRULE) stats.recur++;
+      events.push({
+        tz: tz,
+        title: P.SUMMARY ? oneLine(icsUnescape(P.SUMMARY.value)) : "",
+        date: st.date, start: st.time, end: endTime,
+        location: P.LOCATION ? oneLine(icsUnescape(P.LOCATION.value)) : "",
+        description: P.DESCRIPTION ? icsUnescape(P.DESCRIPTION.value) : "",
+        reminder: rem
+      });
+    });
+    return { events: events, stats: stats };
+  }
+
+  // Appends imported events. A single completely empty event is replaced.
+  function importIcsText(text, name) {
+    var res = parseIcs(text, settings.refTz), st = res.stats, evs = res.events;
+    var existing = cards();
+    var replaceEmpty = existing.length === 1 && evs.length > 0 && !(function (c) {
+      var d = readCard(c);
+      return d.title || d.date || d.start || d.end || d.location || d.description;
+    })(existing[0]);
+    var room = Math.max(0, MAX_EVENTS - (existing.length - (replaceEmpty ? 1 : 0)));
+    var take = evs.slice(0, room);
+    var lines = [];
+    if (take.length) {
+      lines.push(take.length === 1 ? { key: "impOne", args: { name: name } }
+                                   : { key: "impMany", args: { n: take.length, name: name } });
+      if (st.utc) lines.push({ key: "impUtc", args: { tz: settings.refTz } });
+    } else {
+      lines.push({ key: "impNone" });
+    }
+    if (st.allDay) lines.push({ key: "impAllDay", args: { n: st.allDay } });
+    if (st.noStart) lines.push({ key: "impNoStart", args: { n: st.noStart } });
+    if (st.recur) lines.push({ key: "impRecur", args: { n: st.recur } });
+    if (st.endDropped) lines.push({ key: "impEnd", args: { n: st.endDropped } });
+    if (st.remDropped) lines.push({ key: "impRem", args: { n: st.remDropped } });
+    if (st.badTz.length) lines.push({ key: "impTz", args: { tz: st.badTz.join(", "), def: settings.refTz } });
+    if (take.length < evs.length) lines.push({ key: "impCap", args: { max: MAX_EVENTS } });
+    impState = { kind: take.length ? "ok" : "error", lines: lines };
+    renderImpMsg();
+    if (!take.length) return;
+
+    if (replaceEmpty) $("events").removeChild(existing[0]);
+    var added = take.map(function (ev) { return restoreCard(ev); });
+    numberCards();
+    msgState = null; renderMsg();
+    added.forEach(update);
+    if (added[0].scrollIntoView) added[0].scrollIntoView({ block: "nearest" });
+  }
+
+  function renderCardMsg(card) {
+    var el = q(card, ".cardmsg"), s = card._msg;
+    if (!s) { el.textContent = ""; el.className = "msg cardmsg"; return; }
+    el.textContent = t(s.key, s.args);
+    el.className = "msg cardmsg " + s.kind;
+  }
+
+  function setNote(el, key, args) { el._note = key ? { key: key, args: args } : null; renderNoteEl(el); }
+  function renderNoteEl(el) {
+    var n = el._note;
+    el.textContent = n ? t(n.key, n.args) : "";
+    el.className = (n ? "note show" : "note") + (el.classList.contains("tznote") ? " tznote" : "");
+  }
+
+  /* ---------- rendering ---------- */
+
+  // "1 h 30", "2 h", "45 min" / "1時間30分"
+  function fmtDuration(min) {
+    var h = Math.floor(min / 60), m = min % 60;
+    if (lang === "ja") return (h ? h + "時間" : "") + (m ? m + "分" : "");
+    return h ? h + " h" + (m ? " " + pad2(m) : "") : m + " min";
+  }
+
+  function renderVerification(card) {
+    var c = compute(card);
+    // Duration below the end time box, only when start and end are both valid.
+    q(card, ".durtext").textContent = c.start && c.end
+      ? t("durLabel", { d: fmtDuration(Math.round((c.end - c.start) / 60000)) }) : "";
+    var tbody = q(card, ".vbody");
+    tbody.innerHTML = "";
+    var rows = [{ tz: c.tz, ref: true }];
+    settings.zones.forEach(function (z) { if (z !== c.tz) rows.push({ tz: z, ref: false }); });
+
+    rows.forEach(function (row) {
+      var tr = document.createElement("tr");
+      var a = document.createElement("td");
+      var b = document.createElement("td");
+      a.textContent = zoneLabel(row.tz);
+      if (row.ref) {
+        var tag = document.createElement("span");
+        tag.className = "reftag";
+        tag.textContent = "(" + t("refTag") + ")";
+        a.appendChild(tag);
+      }
+      if (c.start) {
+        var s = zoneParts(c.start, row.tz, lang);
+        var txt = s.date + " (" + s.wd + ") " + s.time;
+        if (c.end) {
+          var e = zoneParts(c.end, row.tz, lang);
+          txt += " – " + (e.date !== s.date ? e.date + " " : "") + e.time;
+        }
+        b.textContent = txt + " (" + s.tz + ")";
+      } else {
+        b.textContent = "–";
+      }
+      tr.appendChild(a); tr.appendChild(b);
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Generated text: subject from the first event (+ " (+N more)"), body from intro, one line per event, closing.
+  // Generated pieces (dates, zone names) are English; the template itself is free text.
+  function renderEmail() {
+    var outS = $("genSubject"), outB = $("genBody");
+    var items = [];
+    selectedCards().forEach(function (card) { // the text accompanies the selected events only
+      var c = compute(card);
+      if (c.start) items.push({ card: card, c: c });
+    });
+    if (!items.length) { outS.value = ""; outB.value = ""; return; }
+
+    function longDate(instant, tz) {
+      var p = {};
+      new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "long", day: "2-digit", month: "long" })
+        .formatToParts(instant).forEach(function (x) { p[x.type] = x.value; });
+      return p.weekday + " " + p.day + " " + p.month;
+    }
+    function emailName(tz) {
+      return EMAIL_NAMES[tz] || ZNAMES.en[tz] || tz.split("/").pop().replace(/_/g, " ");
+    }
+    // Event's own zone first, then the shared verification zones (same order as the verification section).
+    function timesText(instant, refTz) {
+      var tzs = [refTz];
+      settings.zones.forEach(function (z) { if (z !== refTz) tzs.push(z); });
+      var refDate = longDate(instant, refTz);
+      var list = tzs.map(function (tz) {
+        var d = longDate(instant, tz);
+        return zoneParts(instant, tz, "en").time + " (" + emailName(tz) + (d !== refDate ? ", " + d : "") + ")";
+      });
+      return list.length > 1
+        ? list.slice(0, -1).join(", ") + " and " + list[list.length - 1]
+        : list[0];
+    }
+    function valsFor(it) {
+      return {
+        title: q(it.card, ".f-title").value.trim() || "Meeting",
+        date: longDate(it.c.start, it.c.tz),
+        times: timesText(it.c.start, it.c.tz),
+        end_times: it.c.end ? timesText(it.c.end, it.c.tz) : "",
+        location: q(it.card, ".f-location").value.trim()
+      };
+    }
+    function fill(tpl, vals) {
+      return tpl.replace(/\{(\w+)\}/g, function (m, k) {
+        return Object.prototype.hasOwnProperty.call(vals, k) ? vals[k] : m;
+      });
+    }
+
+    var first = valsFor(items[0]);
+    var many = items.length > 1;
+    outS.value = fill(settings.subjectTpl, first) + (many ? t("moreSuffix", { n: items.length - 1 }) : "");
+
+    var lines = items.map(function (it) {
+      var line = fill(settings.lineTpl, valsFor(it)).trim();
+      return line && many ? "- " + line : line;
+    }).filter(Boolean);
+    outB.value = [fill(settings.introTpl, first).trim(), lines.join("\n"), fill(settings.closingTpl, first).trim()]
+      .filter(Boolean).join("\n\n");
+  }
+
+  function renderOutput() {
+    cards().forEach(renderVerification);
+    renderEmail();
+    saveEvents();
+    renderGenUi();
+  }
+
+  // Neutral notice (not an error): the start time is valid but no end time is set.
+  function infoFor(card) {
+    var c = compute(card);
+    return c.start && !q(card, ".f-end").value.trim() ? { key: "iNoEnd", kind: "info" } : null;
+  }
+
+  // Live message of a card: order or daylight-saving error, else the "no end time" notice.
+  function liveMsg(card) {
+    var c = compute(card);
+    return c.orderErr ? { key: "eOrder", kind: "error" }
+         : c.gapErr ? { key: "eGap", kind: "error" } : infoFor(card);
+  }
+
+  // Called whenever a card's date, times or time zone change.
+  function update(card) {
+    card._msg = liveMsg(card);
+    renderCardMsg(card);
+    msgState = null;
+    renderMsg();
+    renderOutput();
+  }
+
+  /* ---------- zone dialog (shared verification list) ---------- */
+
+  function renderZoneDialog() {
+    var tbody = $("zoneList");
+    tbody.innerHTML = "";
+    settings.zones.forEach(function (z) {
+      var tr = document.createElement("tr");
+      var a = document.createElement("td");
+      var x = document.createElement("td");
+      x.className = "rm";
+      a.textContent = zoneLabel(z);
+      if (zoneLabel(z) !== z) {
+        var id = document.createElement("span");
+        id.className = "zid";
+        id.textContent = z;
+        a.appendChild(id);
+      }
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "secondary small";
+      btn.textContent = "×";
+      btn.title = t("remove");
+      btn.setAttribute("aria-label", t("remove") + ": " + z);
+      btn.addEventListener("click", function () {
+        settings.zones = settings.zones.filter(function (v) { return v !== z; });
+        saveSettings();
+        setNote($("zoneNote"), null);
+        renderZoneDialog();
+        renderOutput();
+      });
+      x.appendChild(btn);
+      tr.appendChild(a); tr.appendChild(x);
+      tbody.appendChild(tr);
+    });
+  }
+  function openZoneDialog() {
+    var d = $("zoneDialog");
+    renderZoneDialog();
+    setNote($("zoneNote"), null);
+    if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+    $("zoneInput").focus();
+  }
+  function closeZoneDialog() {
+    var d = $("zoneDialog");
+    if (typeof d.close === "function") d.close(); else d.removeAttribute("open");
+  }
+  function addZone() {
+    var el = $("zoneInput");
+    var raw = el.value.trim();
+    if (!raw) return;
+    var c = canonTz(raw);
+    if (!c) { setNote($("zoneNote"), "eTz", { tz: raw }); return; }
+    if (settings.zones.indexOf(c) >= 0) { setNote($("zoneNote"), "eDup"); return; }
+    settings.zones.push(c);
+    saveSettings();
+    el.value = "";
+    setNote($("zoneNote"), null);
+    renderZoneDialog();
+    renderOutput();
+  }
+  $("zoneAdd").addEventListener("click", addZone);
+  $("zoneInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); addZone(); }
+  });
+  $("zoneReset").addEventListener("click", function () {
+    settings.zones = DEFAULT_ZONES.slice();
+    saveSettings();
+    setNote($("zoneNote"), null);
+    renderZoneDialog();
+    renderOutput();
+  });
+  $("zoneClose").addEventListener("click", closeZoneDialog);
+
+  /* ---------- themes ---------- */
+
+  // Themes: id, plain name (proper names are not translated) or i18n key.
+  var THEMES = [
+    { id: "system", key: "themeSystem" },
+    { id: "light", key: "themeLight" },
+    { id: "dark", key: "themeDark" },
+    { id: "rose-pine", name: "Rosé Pine" },
+    { id: "rose-pine-moon", name: "Rosé Pine Moon" },
+    { id: "rose-pine-dawn", name: "Rosé Pine Dawn" },
+    { id: "nord", name: "Nord" },
+    { id: "dracula", name: "Dracula" },
+    { id: "catppuccin-latte", name: "Catppuccin Latte" },
+    { id: "catppuccin-frappe", name: "Catppuccin Frappé" },
+    { id: "catppuccin-macchiato", name: "Catppuccin Macchiato" },
+    { id: "catppuccin-mocha", name: "Catppuccin Mocha" }
+  ];
+  function isThemeId(id) { return THEMES.some(function (th) { return th.id === id; }); }
+
+  var darkQuery = (typeof window.matchMedia === "function") ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var LIGHT_THEMES = ["light", "rose-pine-dawn", "catppuccin-latte"];
+  var resolvedTheme = "light";
+  function applyTheme() {
+    var id = settings.theme;
+    if (id === "system") id = darkQuery && darkQuery.matches ? "dark" : "light";
+    resolvedTheme = id;
+    document.documentElement.setAttribute("data-theme", id);
+    updateThemeButton();
+  }
+  function themeLabel(th) { return th.key ? t(th.key) : th.name; }
+  // Sun icon for light themes, moon icon for dark themes; tooltip shows the current theme.
+  function updateThemeButton() {
+    var light = LIGHT_THEMES.indexOf(resolvedTheme) >= 0;
+    $("iconSun").style.display = light ? "" : "none";
+    $("iconMoon").style.display = light ? "none" : "";
+    var cur = THEMES.filter(function (th) { return th.id === settings.theme; })[0];
+    var label = t("theme") + (cur ? ": " + themeLabel(cur) : "");
+    $("themeBtn").setAttribute("title", label);
+    $("themeBtn").setAttribute("aria-label", label);
+  }
+  if (darkQuery) {
+    var onScheme = function () { if (settings && settings.theme === "system") applyTheme(); };
+    if (darkQuery.addEventListener) darkQuery.addEventListener("change", onScheme);
+    else if (darkQuery.addListener) darkQuery.addListener(onScheme);
+  }
+  // Theme menu: opened by the sun/moon button.
+  function menuItems() { return Array.prototype.slice.call($("themeMenu").querySelectorAll("button")); }
+  function isMenuOpen() { return !$("themeMenu").hidden; }
+  function setMenuOpen(open, focusItem) {
+    $("themeMenu").hidden = !open;
+    $("themeBtn").setAttribute("aria-expanded", open ? "true" : "false");
+    if (open && focusItem !== false) {
+      var items = menuItems();
+      var sel = items.filter(function (b) { return b.getAttribute("aria-checked") === "true"; })[0] || items[0];
+      if (sel) sel.focus();
+    }
+  }
+  function buildThemeMenu() {
+    var menu = $("themeMenu");
+    menu.innerHTML = "";
+    THEMES.forEach(function (th) {
+      var li = document.createElement("li");
+      li.setAttribute("role", "none");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", th.id === settings.theme ? "true" : "false");
+      b.setAttribute("data-theme-id", th.id);
+      b.textContent = themeLabel(th);
+      b.addEventListener("click", function () {
+        settings.theme = th.id;
+        saveSettings();
+        applyTheme();
+        buildThemeMenu();
+        setMenuOpen(false, false);
+        $("themeBtn").focus();
+      });
+      li.appendChild(b);
+      menu.appendChild(li);
+    });
+    updateThemeButton();
+  }
+  $("themeBtn").addEventListener("click", function () { setMenuOpen(!isMenuOpen()); });
+  $("themeMenu").addEventListener("keydown", function (e) {
+    var items = menuItems(), i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    else if (e.key === "Escape") { e.preventDefault(); setMenuOpen(false, false); $("themeBtn").focus(); }
+    else if (e.key === "Tab") { setMenuOpen(false, false); }
+  });
+  document.addEventListener("mousedown", function (e) {
+    if (isMenuOpen() && !$("themeWrap").contains(e.target)) setMenuOpen(false, false);
+  });
+
+  /* ---------- language ---------- */
+
+  function translate(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-i18n]"), function (el) {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-i18n-ph]"), function (el) {
+      el.setAttribute("placeholder", t(el.getAttribute("data-i18n-ph")));
+    });
+    Array.prototype.forEach.call(root.querySelectorAll("[data-i18n-title]"), function (el) {
+      el.setAttribute("title", t(el.getAttribute("data-i18n-title")));
+    });
+  }
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.title = t("pageTitle");
+    buildThemeMenu();
+    translate(document);
+    numberCards();
+    cards().forEach(function (card) { renderCardMsg(card); renderNoteEl(q(card, ".tznote")); });
+    renderMsg();
+    renderImpMsg();
+    renderToast();
+    renderNoteEl($("zoneNote"));
+    if ($("zoneDialog").open) renderZoneDialog();
+    renderOutput();
+  }
+
+  /* ---------- tabs ---------- */
+
+  function showTab(which) {
+    var ev = which === "events";
+    $("tabEvents").setAttribute("aria-selected", ev ? "true" : "false");
+    $("tabEvents").tabIndex = ev ? 0 : -1;
+    $("tabEmail").setAttribute("aria-selected", ev ? "false" : "true");
+    $("tabEmail").tabIndex = ev ? -1 : 0;
+    $("panelEvents").hidden = !ev;
+    $("panelEmail").hidden = ev;
+  }
+  $("tabEvents").addEventListener("click", function () { showTab("events"); });
+  $("tabEmail").addEventListener("click", function () { showTab("email"); });
+  [$("tabEvents"), $("tabEmail")].forEach(function (tab) {
+    tab.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      var toEmail = tab === $("tabEvents");
+      showTab(toEmail ? "email" : "events");
+      (toEmail ? $("tabEmail") : $("tabEvents")).focus();
+    });
+  });
+
+  /* ---------- setup: time zone datalist ---------- */
+
+  (function buildTzList() {
+    var list = [];
+    try { if (Intl.supportedValuesOf) list = Intl.supportedValuesOf("timeZone").slice(); } catch (e) {}
+    DEFAULT_ZONES.concat(["UTC"]).forEach(function (z) { if (list.indexOf(z) < 0) list.push(z); });
+    list.sort();
+    var dl = $("tzlist");
+    list.forEach(function (z) {
+      var o = document.createElement("option");
+      o.value = z;
+      dl.appendChild(o);
+    });
+  })();
+
+  /* ---------- events ---------- */
+
+  $("lang").addEventListener("click", function () {
+    lang = lang === "en" ? "ja" : "en";
+    settings.lang = lang;
+    saveSettings();
+    applyLang();
+  });
+
+  // New events start with the previous event's time zone, date and reminder, and its end time as the
+  // start time (date and times only when the previous value is valid).
+  $("addEvent").addEventListener("click", function () {
+    var all = cards();
+    var prev = all.length ? all[all.length - 1] : null;
+    var card = addCard(prev ? prev.dataset.tz : settings.refTz);
+    if (prev) {
+      var pd = normDate(q(prev, ".f-date").value);
+      if (pd && parseDate(pd)) q(card, ".f-date").value = pd;
+      var pe = normTime(q(prev, ".f-end").value);
+      if (pe && parseTime(pe)) q(card, ".f-start").value = pe;
+      q(card, ".f-reminder").value = q(prev, ".f-reminder").value;
+    }
+    update(card);
+    q(card, ".f-title").focus();
+    if (card.scrollIntoView) card.scrollIntoView({ block: "nearest" });
+  });
+
+  // Import an .ics file (UTF-8 text, up to 2 MB).
+  $("importIcs").addEventListener("click", function () { $("icsFile").click(); });
+  $("icsFile").addEventListener("change", function () {
+    var input = $("icsFile");
+    var f = input.files && input.files[0];
+    input.value = "";
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024) {
+      impState = { kind: "error", lines: [{ key: "impBig" }] };
+      renderImpMsg();
+      return;
+    }
+    var fr = new FileReader();
+    fr.onload = function () { importIcsText(String(fr.result), f.name); };
+    fr.onerror = function () { impState = { kind: "error", lines: [{ key: "impNone" }] }; renderImpMsg(); };
+    fr.readAsText(f);
+  });
+
+  // Validates one card; returns an error key or null. Valid events are appended to evs.
+  function validateCard(card, evs) {
+    var title = q(card, ".f-title").value.trim();
+    var dateEl = q(card, ".f-date"), sEl = q(card, ".f-start"), eEl = q(card, ".f-end");
+    var dateStr = normDate(dateEl.value) || dateEl.value.trim();
+    dateEl.value = dateStr;
+    if (!title || !dateStr || !sEl.value) return "eRequired";
+    if (!parseDate(dateStr)) return "eDate";
+    sEl.value = normTime(sEl.value) || sEl.value.trim();
+    var hasEnd = !!eEl.value.trim();
+    if (hasEnd) eEl.value = normTime(eEl.value) || eEl.value.trim(); else eEl.value = "";
+    if (!parseTime(sEl.value) || (hasEnd && !parseTime(eEl.value))) return "eTime";
+    var c = compute(card);
+    if (c.gapErr) return "eGap";
+    if (c.orderErr || !c.start || (hasEnd && !c.end)) return "eOrder";
+    evs.push({
+      title: title, dateStr: dateStr, start: c.start, end: c.end, // end is null when no end time is set
+      location: q(card, ".f-location").value.trim(),
+      description: q(card, ".f-description").value.trim(),
+      reminder: q(card, ".f-reminder").value
+    });
+    return null;
+  }
+
+  // Generate: only the selected events are checked. Blocked until all of them are valid;
+  // the first invalid card is scrolled into view. Nothing is downloaded until a Download button is used.
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var sel = selectedCards();
+    if (!sel.length) return;
+    var evs = [], firstBad = null;
+    cards().forEach(function (card) {
+      if (sel.indexOf(card) < 0) { card._msg = liveMsg(card); renderCardMsg(card); return; }
+      var err = validateCard(card, evs);
+      card._msg = err ? { key: err, kind: "error" } : infoFor(card);
+      renderCardMsg(card);
+      if (err && !firstBad) firstBad = card;
+    });
+    msgState = null; renderMsg();
+    renderOutput();
+    if (firstBad) {
+      if (firstBad.scrollIntoView) firstBad.scrollIntoView({ block: "center" });
+      return;
+    }
+    var files = [];
+    if (settings.fileMode === "separate") {
+      var names = uniqueNames(evs.map(function (ev) { return fileName(ev.title, ev.dateStr, 0); }));
+      evs.forEach(function (ev, i) { files.push({ name: names[i], content: buildIcs([ev]), titles: [ev.title] }); });
+    } else {
+      files.push({
+        name: fileName(evs[0].title, evs[0].dateStr, evs.length - 1), content: buildIcs(evs),
+        titles: evs.map(function (ev) { return ev.title; })
+      });
+    }
+    generated = { sig: genSig(), files: files };
+    renderFileList();
+    if ($("fileList").scrollIntoView) $("fileList").scrollIntoView({ block: "nearest" });
+  });
+
+  // File layout and selection controls
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="fileMode"]'), function (r) {
+    r.addEventListener("change", function () {
+      if (!r.checked) return;
+      settings.fileMode = r.value;
+      saveSettings();
+      renderOutput();
+    });
+  });
+  function setAllSelected(v) {
+    cards().forEach(function (c) { q(c, ".f-sel").checked = v; });
+    renderOutput();
+  }
+  $("selAll").addEventListener("click", function () { setAllSelected(true); });
+  $("selNone").addEventListener("click", function () { setAllSelected(false); });
+
+  // Clear: removes all events and leaves one empty event.
+  // Saved settings (zone list, templates, language, theme) are kept.
+  $("clearBtn").addEventListener("click", function () {
+    $("events").innerHTML = "";
+    var card = addCard(settings.refTz);
+    generated = null;
+    hideToast();
+    impState = null; renderImpMsg();
+    msgState = null;
+    renderMsg();
+    renderOutput();
+    q(card, ".f-title").focus();
+  });
+
+  // Copy buttons for the generated subject and message.
+  Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var text = $(btn.getAttribute("data-copy")).value;
+      if (!text) return;
+      var key = btn.getAttribute("data-i18n");
+      function done() { btn.textContent = t("copied"); setTimeout(function () { btn.textContent = t(key); }, 1500); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {});
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); done(); } catch (err) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+
+  // Email template editing (saved in the browser).
+  var TPL_FIELDS = { tplSubject: "subjectTpl", tplIntro: "introTpl", tplLine: "lineTpl", tplClosing: "closingTpl" };
+  var lastTpl = $("tplLine");
+  Object.keys(TPL_FIELDS).forEach(function (id) {
+    var el = $(id);
+    el.addEventListener("focus", function () { lastTpl = el; });
+    el.addEventListener("input", function () {
+      settings[TPL_FIELDS[id]] = el.value;
+      saveSettings();
+      renderEmail();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("button.chip"), function (chip) {
+    chip.addEventListener("mousedown", function (e) { e.preventDefault(); }); // keep cursor in the field
+    chip.addEventListener("click", function () {
+      var el = lastTpl, ph = chip.getAttribute("data-ph");
+      var s = el.selectionStart, e = el.selectionEnd;
+      if (typeof s !== "number") { s = e = el.value.length; }
+      el.value = el.value.slice(0, s) + ph + el.value.slice(e);
+      el.selectionStart = el.selectionEnd = s + ph.length;
+      el.focus();
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+  $("tplReset").addEventListener("click", function () {
+    settings.subjectTpl = DEFAULT_SUBJECT_TPL;
+    settings.introTpl = DEFAULT_INTRO_TPL;
+    settings.lineTpl = DEFAULT_LINE_TPL;
+    settings.closingTpl = DEFAULT_CLOSING_TPL;
+    Object.keys(TPL_FIELDS).forEach(function (id) { $(id).value = settings[TPL_FIELDS[id]]; });
+    saveSettings();
+    renderEmail();
+  });
+
+  /* ---------- init ---------- */
+
+  settings = loadSettings();
+  lang = settings.lang;
+  applyTheme();
+  Object.keys(TPL_FIELDS).forEach(function (id) { $(id).value = settings[TPL_FIELDS[id]]; });
+  restoreEvents();
+  applyLang();
+  cards().forEach(update); // show per-event errors (e.g. end before start) for restored data
+})();
+</script>
+</body>
+</html>
