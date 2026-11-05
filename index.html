@@ -217,6 +217,28 @@
     border-radius: 10px; padding: 20px; width: calc(100% - 32px); max-width: 520px;
   }
   dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+  .addwrap { position: relative; }
+  #addMenu {
+    position: absolute; left: 0; top: 100%; z-index: 20; margin: 4px 0 0; padding: 4px 0;
+    list-style: none; min-width: 230px; max-width: 80vw; max-height: 70vh; overflow-y: auto;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  }
+  #addMenu[hidden] { display: none; }
+  #addMenu button {
+    display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: transparent;
+    color: var(--text); font-weight: 500; padding: 7px 14px; overflow-wrap: anywhere;
+  }
+  #addMenu button:hover:not(:disabled), #addMenu button:focus-visible { background: var(--accent); color: var(--accent-text); outline: none; }
+  #addMenu button:disabled { color: var(--muted); cursor: default; }
+  #addMenu li.sep { border-top: 1px solid var(--border); margin: 4px 0; }
+  .tplfields { border: 0; margin: 14px 0 0; padding: 0; }
+  .tplfields legend { padding: 0; font-weight: 600; }
+  .tplfields label { display: flex; gap: 8px; align-items: center; margin: 6px 0 0; font-weight: 400; }
+  .tplfields input { width: auto; margin: 0; }
+  .tplfields label.off { display: none; }
+  #tplMgrList input { width: 100%; }
+  #tplMgrList td:first-child { padding-right: 8px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
   button.chip {
     padding: 2px 8px; font-size: 0.85rem; font-weight: 500; background: transparent;
@@ -260,7 +282,10 @@
       </div>
       <div id="events"></div>
       <div class="actions" style="margin-top:0">
-        <button type="button" class="secondary" id="addEvent" data-i18n="btnAddEvent"></button>
+        <div class="addwrap" id="addWrap">
+          <button type="button" class="secondary" id="addEvent" aria-haspopup="true" aria-expanded="false" aria-controls="addMenu"><span data-i18n="btnAddEvent"></span> ▾</button>
+          <ul id="addMenu" hidden></ul>
+        </div>
         <button type="button" class="secondary" id="importIcs" data-i18n="btnImport"></button>
         <input type="file" id="icsFile" accept=".ics,text/calendar" hidden>
       </div>
@@ -275,7 +300,6 @@
         <button type="submit" id="genBtn"></button>
         <button type="button" class="secondary" id="clearBtn" data-i18n="btnClear"></button>
       </div>
-      <div id="msg" class="msg" role="alert"></div>
       <div id="fileList" aria-live="polite"></div>
     </form>
   </section>
@@ -331,6 +355,35 @@
     <div class="actions"><button type="button" id="zoneClose" data-i18n="btnClose"></button></div>
   </dialog>
 
+  <dialog id="tplDialog" aria-labelledby="tplDialogTitle">
+    <h2 id="tplDialogTitle" data-i18n="tplDlgTitle"></h2>
+    <label for="tplName" style="margin-top:0" data-i18n="tplName"></label>
+    <input id="tplName" type="text" maxlength="40" data-i18n-ph="phTplName">
+    <fieldset class="tplfields">
+      <legend data-i18n="tplFields"></legend>
+      <label><input type="checkbox" data-f="title"> <span data-i18n="fTitle"></span></label>
+      <label><input type="checkbox" data-f="tz"> <span data-i18n="fTz"></span></label>
+      <label><input type="checkbox" data-f="start"> <span data-i18n="fStart"></span></label>
+      <label><input type="checkbox" data-f="dur"> <span data-i18n="fDuration"></span></label>
+      <label><input type="checkbox" data-f="location"> <span data-i18n="fLocation"></span></label>
+      <label><input type="checkbox" data-f="description"> <span data-i18n="fDesc"></span></label>
+      <label><input type="checkbox" data-f="reminder"> <span data-i18n="fReminder"></span></label>
+    </fieldset>
+    <div class="note" id="tplNote" role="alert"></div>
+    <div class="actions">
+      <button type="button" id="tplSave" data-i18n="btnSave"></button>
+      <button type="button" class="secondary" id="tplCancel" data-i18n="btnCancel"></button>
+    </div>
+  </dialog>
+
+  <dialog id="tplMgrDialog" aria-labelledby="tplMgrTitle">
+    <h2 id="tplMgrTitle" data-i18n="mgrTitle"></h2>
+    <p class="hint" id="tplMgrEmpty" data-i18n="mgrEmpty"></p>
+    <table><tbody id="tplMgrList"></tbody></table>
+    <div class="note" id="tplMgrNote" role="alert"></div>
+    <div class="actions"><button type="button" id="tplMgrClose" data-i18n="btnClose"></button></div>
+  </dialog>
+
   <div id="toast" class="toast" role="status" hidden>
     <span id="toastText"></span>
     <button type="button" class="secondary small" id="toastUndo"></button>
@@ -376,7 +429,15 @@
       heading: "Calendar Invite Generator",
       tabEvents: "Events", tabEmail: "Email text",
       eventN: "Event {n}",
-      btnAddEvent: "Add event", btnDeleteEvent: "Delete event", btnDuplicate: "Duplicate",
+      btnAddEvent: "Add event", btnDeleteEvent: "Delete event",
+      menuNew: "New event", menuDup: "Duplicate last event", menuManage: "Manage templates…",
+      btnTplSave: "Save as template", btnSave: "Save", btnCancel: "Cancel",
+      tplDlgTitle: "Save as template", tplName: "Template name", phTplName: "e.g. Weekly meeting",
+      tplFields: "Fields to save",
+      eTplName: "Enter a template name.", eTplNone: "Select at least one field.",
+      eTplLimit: "The limit is {n} templates. Delete one in “Manage templates” first.",
+      mgrTitle: "Manage templates", mgrEmpty: "No templates saved.", mgrRename: "Template name",
+      eTplDupName: "A template named “{name}” already exists.",
       btnImport: "Import .ics file",
       toastDeleted: "Event deleted.", btnUndo: "Undo",
       fDuration: "Duration", d30: "30 min", d60: "1 h", d90: "1 h 30", d120: "2 h", d150: "2 h 30", d180: "3 h",
@@ -439,7 +500,15 @@
       heading: "カレンダー招待ジェネレーター",
       tabEvents: "イベント", tabEmail: "メール文面",
       eventN: "イベント {n}",
-      btnAddEvent: "イベントを追加", btnDeleteEvent: "イベントを削除", btnDuplicate: "複製",
+      btnAddEvent: "イベントを追加", btnDeleteEvent: "イベントを削除",
+      menuNew: "新規イベント", menuDup: "最後のイベントを複製", menuManage: "テンプレートを管理…",
+      btnTplSave: "テンプレートとして保存", btnSave: "保存", btnCancel: "キャンセル",
+      tplDlgTitle: "テンプレートとして保存", tplName: "テンプレート名", phTplName: "例: 定例ミーティング",
+      tplFields: "保存する項目",
+      eTplName: "テンプレート名を入力してください。", eTplNone: "項目を1つ以上選択してください。",
+      eTplLimit: "テンプレートは最大{n}件です。先に「テンプレートを管理」で削除してください。",
+      mgrTitle: "テンプレートの管理", mgrEmpty: "保存されたテンプレートはありません。", mgrRename: "テンプレート名",
+      eTplDupName: "「{name}」という名前のテンプレートはすでにあります。",
       btnImport: ".ics ファイルを読み込む",
       toastDeleted: "イベントを削除しました。", btnUndo: "元に戻す",
       fDuration: "所要時間", d30: "30分", d60: "1時間", d90: "1時間30分", d120: "2時間", d150: "2時間30分", d180: "3時間",
@@ -520,12 +589,12 @@
 
   var lang = "en";
   var settings = null;   // {lang, theme, refTz, zones, templates}
-  var msgState = null;   // global message {key, kind, args}
   var seq = 0;           // counter for unique element ids
 
   function t(key, args) {
     var s = I18N[lang][key];
-    if (args) Object.keys(args).forEach(function (k) { s = s.replace("{" + k + "}", args[k]); });
+    // A replacement function keeps "$&", "$1" etc. in the values literal.
+    if (args) Object.keys(args).forEach(function (k) { s = s.replace("{" + k + "}", function () { return String(args[k]); }); });
     return s;
   }
   function pad2(n) { n = String(n); return n.length < 2 ? "0" + n : n; }
@@ -583,10 +652,36 @@
 
   /* ---------- settings (localStorage) ---------- */
 
+  // Event templates: {name, and any of tz, title, start "hh:mm", dur (minutes), location, description, reminder}.
+  var MAX_TEMPLATES = 10;
+  var REMINDER_VALUES = ["", "15", "30", "60", "1440"];
+  function cleanTemplates(list) {
+    var out = [];
+    if (!Array.isArray(list)) return out;
+    list.forEach(function (x) {
+      if (out.length >= MAX_TEMPLATES || !x || typeof x !== "object") return;
+      var name = typeof x.name === "string" ? x.name.trim().slice(0, 40) : "";
+      if (!name) return;
+      var lc = name.toLowerCase();
+      if (out.some(function (o) { return o.name.toLowerCase() === lc; })) return;
+      var tpl = { name: name };
+      var tz = typeof x.tz === "string" ? canonTz(x.tz) : null;
+      if (tz) tpl.tz = tz;
+      if (typeof x.title === "string") tpl.title = x.title.slice(0, 500);
+      if (typeof x.start === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(x.start)) tpl.start = x.start;
+      if (typeof x.dur === "number" && x.dur >= 1 && x.dur < 1440 && Math.floor(x.dur) === x.dur) tpl.dur = x.dur;
+      if (typeof x.location === "string") tpl.location = x.location.slice(0, 2000);
+      if (typeof x.description === "string") tpl.description = x.description.slice(0, 10000);
+      if (typeof x.reminder === "string" && REMINDER_VALUES.indexOf(x.reminder) >= 0) tpl.reminder = x.reminder;
+      out.push(tpl);
+    });
+    return out;
+  }
+
   function loadSettings() {
     var s = { v: SETTINGS_VERSION, lang: null, theme: "system", fileMode: "combined", refTz: DEFAULT_REF, zones: DEFAULT_ZONES.slice(),
               subjectTpl: DEFAULT_SUBJECT_TPL, introTpl: DEFAULT_INTRO_TPL,
-              lineTpl: DEFAULT_LINE_TPL, closingTpl: DEFAULT_CLOSING_TPL };
+              lineTpl: DEFAULT_LINE_TPL, closingTpl: DEFAULT_CLOSING_TPL, templates: [] };
     try {
       var raw = localStorage.getItem(STORE_KEY);
       if (raw) {
@@ -599,6 +694,7 @@
         if (typeof o.introTpl === "string") s.introTpl = o.introTpl.slice(0, 2000);
         if (typeof o.lineTpl === "string") s.lineTpl = o.lineTpl.slice(0, 2000);
         if (typeof o.closingTpl === "string") s.closingTpl = o.closingTpl.slice(0, 2000);
+        s.templates = cleanTemplates(o.templates);
         var r = canonTz(o.refTz);
         if (r) s.refTz = r;
         // Zone lists saved by versions older than 2 are discarded in favor of the current defaults.
@@ -624,12 +720,14 @@
 
   /* ---------- parsing and input formatting ---------- */
 
+  // Full-width characters (Japanese input) become ASCII: "１０：３０" -> "10:30".
+  function half(s) { return String(s).normalize("NFKC"); }
   function normDate(s) {
-    var m = /^\s*(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\s*$/.exec(s);
+    var m = /^\s*(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\s*$/.exec(half(s));
     return m ? m[1] + "/" + pad2(m[2]) + "/" + pad2(m[3]) : null;
   }
   function fmtDateDigits(raw) {
-    var d = raw.replace(/\D/g, "").slice(0, 8);
+    var d = half(raw).replace(/\D/g, "").slice(0, 8);
     var out = d.slice(0, 4);
     if (d.length > 4) out += "/" + d.slice(4, 6);
     if (d.length > 6) out += "/" + d.slice(6, 8);
@@ -644,12 +742,12 @@
     return [y, mo, d];
   }
   function normTime(s) {
-    var m = /^\s*(\d{1,2})[:：.](\d{2})\s*$/.exec(s);
+    var m = /^\s*(\d{1,2})[:.](\d{2})\s*$/.exec(half(s));
     return m ? pad2(m[1]) + ":" + m[2] : null;
   }
   // Positional formatting while typing digits ("930" -> "9:30", "1035" -> "10:35").
   function fmtTimeDigits(raw) {
-    var d = raw.replace(/\D/g, "").slice(0, 4);
+    var d = half(raw).replace(/\D/g, "").slice(0, 4);
     if (!d) return "";
     var hl = d.charAt(0) > "2" ? 1 : 2;
     if (d.length <= hl) return d;
@@ -739,7 +837,7 @@
       '<div class="cardhead"><div class="headleft"><h2 class="evtitle"></h2>' +
       '<label class="selwrap"><input type="checkbox" class="f-sel" checked> <span data-i18n="fInclude"></span></label></div>' +
       '<div class="cardbtns">' +
-        '<button type="button" class="secondary small dup" data-i18n="btnDuplicate"></button>' +
+        '<button type="button" class="secondary small tplsave" data-i18n="btnTplSave"></button>' +
         '<button type="button" class="secondary small del" data-i18n="btnDeleteEvent"></button>' +
       '</div></div>' +
 
@@ -826,9 +924,9 @@
     all.forEach(function (card, i) {
       q(card, ".evtitle").textContent = t("eventN", { n: i + 1 });
       q(card, ".del").style.display = i === 0 ? "none" : "";
-      q(card, ".dup").disabled = full;
     });
     $("addEvent").disabled = full;
+    if (full) setAddMenuOpen(false);
   }
 
   function wireCard(card) {
@@ -836,7 +934,14 @@
     function upd() { update(card); }
 
     // Date
-    dateEl.addEventListener("input", function () { dateEl.value = fmtDateDigits(dateEl.value); upd(); });
+    // While an input method composes text (Japanese), formatting waits for the end of the composition.
+    function onDateInput(e) {
+      if (e && e.isComposing) return;
+      dateEl.value = fmtDateDigits(dateEl.value);
+      upd();
+    }
+    dateEl.addEventListener("input", onDateInput);
+    dateEl.addEventListener("compositionend", onDateInput);
     dateEl.addEventListener("blur", function () {
       var n = normDate(dateEl.value);
       if (n) { dateEl.value = n; upd(); }
@@ -899,24 +1004,14 @@
     // Selection for download
     q(card, ".f-sel").addEventListener("change", renderOutput);
 
-    // Duplicate: a copy of all fields directly below this event (always selected).
-    q(card, ".dup").addEventListener("click", function () {
-      if (cards().length >= MAX_EVENTS) return;
-      var data = readCard(card);
-      data.sel = true;
-      var copy = restoreCard(data, cards().indexOf(card) + 1);
-      msgState = null; renderMsg();
-      update(copy);
-      q(copy, ".f-title").focus();
-      if (copy.scrollIntoView) copy.scrollIntoView({ block: "nearest" });
-    });
+    // Save as template
+    q(card, ".tplsave").addEventListener("click", function () { openTplDialog(card); });
 
     // Delete (with undo) and zone dialog
     q(card, ".del").addEventListener("click", function () {
       var state = { ev: readCard(card), index: cards().indexOf(card) };
       card.parentNode.removeChild(card);
       numberCards();
-      msgState = null; renderMsg();
       renderOutput();
       showToast(state);
     });
@@ -979,11 +1074,14 @@
     items.forEach(function (li) { li.addEventListener("click", function () { pick(li.textContent); }); });
     list.addEventListener("mousedown", function (e) { e.preventDefault(); }); // keep focus in the input
     btn.addEventListener("click", function () { setOpen(!isOpen()); input.focus(); });
-    input.addEventListener("input", function () {
+    function onInput(e) {
+      if (e && e.isComposing) return; // wait for the end of an input-method composition
       input.value = fmtTimeDigits(input.value);
       if (isOpen()) { active = -1; mark(); }
       onChange();
-    });
+    }
+    input.addEventListener("input", onInput);
+    input.addEventListener("compositionend", onInput);
     input.addEventListener("blur", function () {
       var n = normTime(input.value);
       if (n) { input.value = n; onChange(); }
@@ -1065,7 +1163,7 @@
       lines.push("SUMMARY:" + escapeText(ev.title));
       if (ev.location) {
         lines.push("LOCATION:" + escapeText(ev.location));
-        if (/^https?:\/\//i.test(ev.location)) lines.push("URL:" + ev.location);
+        if (/^https?:\/\/\S+$/i.test(ev.location)) lines.push("URL:" + ev.location); // no spaces: a valid URI
       }
       if (ev.description) lines.push("DESCRIPTION:" + escapeText(ev.description));
       lines.push("STATUS:CONFIRMED", "TRANSP:OPAQUE");
@@ -1080,7 +1178,9 @@
   }
   // One event: {title}_{date}.ics. Several events: {first title}_{first date}_plus{N}.ics.
   function fileName(title, dateStr, extra) {
-    var slug = title.trim().replace(/[^\w\-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "meeting";
+    // Letters and digits of any language are kept; other characters become "_".
+    var slug = Array.from(title.normalize("NFC").trim().replace(/[^\p{L}\p{M}\p{N}_\-]+/gu, "_").replace(/^_+|_+$/g, ""))
+      .slice(0, 60).join("").replace(/_+$/, "") || "meeting";
     return slug + (dateStr ? "_" + dateStr.replace(/\//g, "-") : "") + (extra > 0 ? "_plus" + extra : "") + ".ics";
   }
   function download(name, content) {
@@ -1093,14 +1193,6 @@
   }
 
   /* ---------- messages and notes ---------- */
-
-  function renderMsg() {
-    var m = $("msg");
-    if (!msgState) { m.textContent = ""; m.className = "msg"; return; }
-    m.textContent = t(msgState.key, msgState.args);
-    m.className = "msg " + msgState.kind;
-  }
-  function showMsg(key, kind, args) { msgState = { key: key, kind: kind, args: args }; renderMsg(); }
 
   // Undo notice after deleting an event (one level, disappears after a few seconds).
   var toastState = null, toastTimer = null;
@@ -1123,7 +1215,6 @@
     hideToast();
     if (!s || cards().length >= MAX_EVENTS) return;
     var card = restoreCard(s.ev, s.index);
-    msgState = null; renderMsg();
     update(card);
     if (card.scrollIntoView) card.scrollIntoView({ block: "nearest" });
   });
@@ -1375,7 +1466,6 @@
     if (replaceEmpty) $("events").removeChild(existing[0]);
     var added = take.map(function (ev) { return restoreCard(ev); });
     numberCards();
-    msgState = null; renderMsg();
     added.forEach(update);
     if (added[0].scrollIntoView) added[0].scrollIntoView({ block: "nearest" });
   }
@@ -1524,8 +1614,6 @@
   function update(card) {
     card._msg = liveMsg(card);
     renderCardMsg(card);
-    msgState = null;
-    renderMsg();
     renderOutput();
   }
 
@@ -1716,11 +1804,14 @@
     translate(document);
     numberCards();
     cards().forEach(function (card) { renderCardMsg(card); renderNoteEl(q(card, ".tznote")); });
-    renderMsg();
     renderImpMsg();
     renderToast();
     renderNoteEl($("zoneNote"));
     if ($("zoneDialog").open) renderZoneDialog();
+    renderNoteEl($("tplNote"));
+    renderNoteEl($("tplMgrNote"));
+    if ($("tplMgrDialog").open) renderMgrDialog();
+    if (isAddMenuOpen()) { $("addMenu").hidden = true; setAddMenuOpen(true); }
     renderOutput();
   }
 
@@ -1773,7 +1864,7 @@
 
   // New events start with the previous event's time zone, date and reminder, and its end time as the
   // start time (date and times only when the previous value is valid).
-  $("addEvent").addEventListener("click", function () {
+  function newEventCard() {
     var all = cards();
     var prev = all.length ? all[all.length - 1] : null;
     var card = addCard(prev ? prev.dataset.tz : settings.refTz);
@@ -1784,9 +1875,226 @@
       if (pe && parseTime(pe)) q(card, ".f-start").value = pe;
       q(card, ".f-reminder").value = q(prev, ".f-reminder").value;
     }
+    return card;
+  }
+  function finishAdd(card) {
     update(card);
+    saveEvents();
     q(card, ".f-title").focus();
     if (card.scrollIntoView) card.scrollIntoView({ block: "nearest" });
+  }
+
+  // Add event menu: new event, duplicate of the last event, one entry per template, manage templates.
+  function addMenuItem(label, onClick, disabled, sep) {
+    var li = document.createElement("li");
+    if (sep) li.className = "sep"; else {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.disabled = !!disabled;
+      b.addEventListener("click", function () { setAddMenuOpen(false, true); onClick(); });
+      li.appendChild(b);
+    }
+    $("addMenu").appendChild(li);
+  }
+  function buildAddMenu() {
+    $("addMenu").innerHTML = "";
+    var all = cards();
+    addMenuItem(t("menuNew"), function () { finishAdd(newEventCard()); });
+    addMenuItem(t("menuDup"), function () {
+      var last = cards().pop();
+      if (!last) return;
+      var data = readCard(last);
+      data.sel = true;
+      finishAdd(restoreCard(data));
+    }, !all.length);
+    if (settings.templates.length) addMenuItem("", null, false, true);
+    settings.templates.forEach(function (tpl) {
+      addMenuItem(tpl.name, function () { finishAdd(applyTemplate(tpl)); });
+    });
+    addMenuItem("", null, false, true);
+    addMenuItem(t("menuManage"), openMgrDialog);
+  }
+  function isAddMenuOpen() { return !$("addMenu").hidden; }
+  function setAddMenuOpen(open, focusBtn) {
+    if (open === isAddMenuOpen()) return;
+    if (open) buildAddMenu();
+    $("addMenu").hidden = !open;
+    $("addEvent").setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      var first = $("addMenu").querySelector("button:not(:disabled)");
+      if (first) first.focus();
+    } else if (focusBtn) $("addEvent").focus();
+  }
+  $("addEvent").addEventListener("click", function () { setAddMenuOpen(!isAddMenuOpen()); });
+  document.addEventListener("click", function (e) {
+    if (isAddMenuOpen() && !$("addWrap").contains(e.target)) setAddMenuOpen(false);
+  });
+  $("addWrap").addEventListener("keydown", function (e) {
+    if (!isAddMenuOpen()) return;
+    if (e.key === "Escape") { e.preventDefault(); setAddMenuOpen(false, true); return; }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    var items = Array.prototype.slice.call($("addMenu").querySelectorAll("button:not(:disabled)"));
+    if (!items.length) return;
+    e.preventDefault();
+    var i = items.indexOf(document.activeElement);
+    i = e.key === "ArrowDown" ? (i + 1) % items.length : (i <= 0 ? items.length - 1 : i - 1);
+    items[i].focus();
+  });
+
+  // A template is applied on top of the "New event" rules. Duration sets the end from the start;
+  // the end stays empty when it would pass midnight.
+  function applyTemplate(tpl) {
+    var card = newEventCard();
+    if (tpl.tz) { card.dataset.tz = tpl.tz; q(card, ".f-tz").value = tpl.tz; }
+    if (typeof tpl.title === "string") q(card, ".f-title").value = tpl.title;
+    if (tpl.start) q(card, ".f-start").value = tpl.start;
+    if (tpl.dur) {
+      var st = parseTime(normTime(q(card, ".f-start").value) || q(card, ".f-start").value.trim());
+      if (st) {
+        var total = st[0] * 60 + st[1] + tpl.dur;
+        q(card, ".f-end").value = total < 1440 ? pad2(Math.floor(total / 60)) + ":" + pad2(total % 60) : "";
+      }
+    }
+    if (typeof tpl.location === "string") q(card, ".f-location").value = tpl.location;
+    if (typeof tpl.description === "string") q(card, ".f-description").value = tpl.description;
+    if (typeof tpl.reminder === "string") q(card, ".f-reminder").value = tpl.reminder;
+    return card;
+  }
+
+  // Save as template dialog.
+  var tplSource = null;
+  function cardDuration(card) {
+    var s = parseTime(normTime(q(card, ".f-start").value) || q(card, ".f-start").value.trim());
+    var e = parseTime(normTime(q(card, ".f-end").value) || q(card, ".f-end").value.trim());
+    if (!s || !e) return null;
+    var d = (e[0] * 60 + e[1]) - (s[0] * 60 + s[1]);
+    return d > 0 ? d : null;
+  }
+  function openTplDialog(card) {
+    tplSource = card;
+    var d = $("tplDialog");
+    var dur = cardDuration(card);
+    var has = {
+      title: !!q(card, ".f-title").value.trim(),
+      tz: true,
+      start: !!parseTime(normTime(q(card, ".f-start").value) || q(card, ".f-start").value.trim()),
+      dur: !!dur,
+      location: !!q(card, ".f-location").value.trim(),
+      description: !!q(card, ".f-description").value.trim(),
+      reminder: true
+    };
+    Array.prototype.forEach.call(d.querySelectorAll("input[data-f]"), function (cb) {
+      var f = cb.getAttribute("data-f");
+      cb.checked = has[f];
+      // Duration is offered only when the event has a start and an end.
+      cb.parentNode.classList.toggle("off", f === "dur" && !dur);
+    });
+    $("tplName").value = q(card, ".f-title").value.trim().slice(0, 40);
+    setNote($("tplNote"), null);
+    if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+    $("tplName").focus();
+    $("tplName").select();
+  }
+  function closeTplDialog() {
+    var d = $("tplDialog");
+    if (typeof d.close === "function") d.close(); else d.removeAttribute("open");
+    tplSource = null;
+  }
+  function saveTemplate() {
+    var card = tplSource;
+    if (!card || !card.parentNode) { closeTplDialog(); return; }
+    var name = $("tplName").value.trim().slice(0, 40);
+    if (!name) { setNote($("tplNote"), "eTplName"); return; }
+    var chosen = {};
+    Array.prototype.forEach.call($("tplDialog").querySelectorAll("input[data-f]"), function (cb) {
+      if (cb.checked && !cb.parentNode.classList.contains("off")) chosen[cb.getAttribute("data-f")] = true;
+    });
+    if (!Object.keys(chosen).length) { setNote($("tplNote"), "eTplNone"); return; }
+    var lc = name.toLowerCase();
+    var at = -1;
+    settings.templates.forEach(function (x, i) { if (x.name.toLowerCase() === lc) at = i; });
+    if (at < 0 && settings.templates.length >= MAX_TEMPLATES) { setNote($("tplNote"), "eTplLimit", { n: MAX_TEMPLATES }); return; }
+    var tpl = { name: name };
+    if (chosen.title) tpl.title = q(card, ".f-title").value;
+    if (chosen.tz) tpl.tz = card.dataset.tz;
+    if (chosen.start) tpl.start = normTime(q(card, ".f-start").value) || q(card, ".f-start").value.trim();
+    if (chosen.dur) tpl.dur = cardDuration(card);
+    if (chosen.location) tpl.location = q(card, ".f-location").value;
+    if (chosen.description) tpl.description = q(card, ".f-description").value;
+    if (chosen.reminder) tpl.reminder = q(card, ".f-reminder").value;
+    tpl = cleanTemplates([tpl])[0];
+    if (!tpl) { setNote($("tplNote"), "eTplNone"); return; }
+    if (at >= 0) settings.templates[at] = tpl; else settings.templates.push(tpl);
+    saveSettings();
+    closeTplDialog();
+  }
+  $("tplSave").addEventListener("click", saveTemplate);
+  $("tplCancel").addEventListener("click", closeTplDialog);
+  $("tplDialog").addEventListener("close", function () { tplSource = null; });
+  $("tplName").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); saveTemplate(); }
+  });
+
+  // Manage templates dialog: rename and delete.
+  function renderMgrDialog() {
+    var body = $("tplMgrList");
+    body.innerHTML = "";
+    $("tplMgrEmpty").hidden = settings.templates.length > 0;
+    settings.templates.forEach(function (tpl, i) {
+      var tr = document.createElement("tr");
+      var a = document.createElement("td");
+      var x = document.createElement("td");
+      x.className = "rm";
+      var inp = document.createElement("input");
+      inp.type = "text";
+      inp.maxLength = 40;
+      inp.value = tpl.name;
+      inp.setAttribute("aria-label", t("mgrRename"));
+      function commit() {
+        var nm = inp.value.trim().slice(0, 40);
+        if (nm === tpl.name) { setNote($("tplMgrNote"), null); return; }
+        var lc = nm.toLowerCase();
+        var clash = settings.templates.some(function (o, j) { return j !== i && o.name.toLowerCase() === lc; });
+        if (!nm) { inp.value = tpl.name; setNote($("tplMgrNote"), "eTplName"); return; }
+        if (clash) { inp.value = tpl.name; setNote($("tplMgrNote"), "eTplDupName", { name: nm }); return; }
+        tpl.name = nm;
+        inp.value = nm;
+        saveSettings();
+        setNote($("tplMgrNote"), null);
+      }
+      inp.addEventListener("change", commit);
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); commit(); }
+      });
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "secondary small";
+      btn.textContent = "×";
+      btn.title = t("remove");
+      btn.setAttribute("aria-label", t("remove") + ": " + tpl.name);
+      btn.addEventListener("click", function () {
+        settings.templates.splice(i, 1);
+        saveSettings();
+        setNote($("tplMgrNote"), null);
+        renderMgrDialog();
+      });
+      a.appendChild(inp);
+      x.appendChild(btn);
+      tr.appendChild(a); tr.appendChild(x);
+      body.appendChild(tr);
+    });
+  }
+  function openMgrDialog() {
+    var d = $("tplMgrDialog");
+    setNote($("tplMgrNote"), null);
+    renderMgrDialog();
+    if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", "");
+    $("tplMgrClose").focus();
+  }
+  $("tplMgrClose").addEventListener("click", function () {
+    var d = $("tplMgrDialog");
+    if (typeof d.close === "function") d.close(); else d.removeAttribute("open");
   });
 
   // Import an .ics file (UTF-8 text, up to 2 MB).
@@ -1831,6 +2139,12 @@
     return null;
   }
 
+  // Enter in an input field must not submit the form (it would generate the files unexpectedly).
+  // Buttons keep Enter, and so does the multi-line description.
+  $("form").addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.isComposing && e.target.tagName === "INPUT") e.preventDefault();
+  });
+
   // Generate: only the selected events are checked. Blocked until all of them are valid;
   // the first invalid card is scrolled into view. Nothing is downloaded until a Download button is used.
   $("form").addEventListener("submit", function (e) {
@@ -1845,7 +2159,6 @@
       renderCardMsg(card);
       if (err && !firstBad) firstBad = card;
     });
-    msgState = null; renderMsg();
     renderOutput();
     if (firstBad) {
       if (firstBad.scrollIntoView) firstBad.scrollIntoView({ block: "center" });
@@ -1890,8 +2203,6 @@
     generated = null;
     hideToast();
     impState = null; renderImpMsg();
-    msgState = null;
-    renderMsg();
     renderOutput();
     q(card, ".f-title").focus();
   });
