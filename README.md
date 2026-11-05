@@ -23,9 +23,16 @@ Everything stays in your browser.
 - **Duplicate** copies an event right below it.
 - **Delete event** removes an event (not available on the first one). **Undo** appears for a few seconds.
 - **Import .ics file** loads events from an existing .ics file.
-- **Clear all** removes all events. Your language, theme, time zone list and email text are kept.
+- **Clear all** removes all events. Your templates, language, theme, time zone list and email text are kept.
 - **End time is optional.** Leave it empty for a meeting with no set end.
 
+## Templates
+
+Use templates for events you create often.
+
+- Saving under an existing name replaces that template.
+- Up to 10 templates can be saved.
+- If the duration would take the event past midnight, the end time is left empty.
 ## Checking the time in other zones
 
 Under each event, open **Time in other zones** to see the event time in other time zones.
