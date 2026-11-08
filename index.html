@@ -98,9 +98,36 @@
   .cardhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .cardhead h2 { margin: 0; }
   .cardbtns { display: flex; gap: 8px; }
-  .durrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 24px; }
+  .durrow { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
+  .durlabel { line-height: 20px; margin-top: 20px; }
+  .durslider { position: relative; flex: 1 1 200px; max-width: 500px; padding: 20px 0 26px; }
+  .durslider input[type=range] {
+    -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 20px;
+    margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer;
+  }
+  .durslider input[type=range]:disabled { opacity: 0.45; cursor: default; }
+  .durslider input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .durslider input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--border); }
+  .durslider input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--border); }
+  .durslider input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--accent);
+  }
+  .durslider input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--accent); }
+  .durslider.off input[type=range]::-webkit-slider-thumb { background: var(--muted); }
+  .durslider.off input[type=range]::-moz-range-thumb { background: var(--muted); }
+  .ticks { position: absolute; left: 0; right: 0; top: 42px; height: 0; }
+  .tkhit { position: absolute; top: -2px; height: 32px; width: calc((100% - 16px) / 20); transform: translateX(-50%); cursor: pointer; }
+  .tk { position: absolute; top: 2px; left: 50%; width: 1px; height: 5px; margin-left: -0.5px; background: var(--muted); opacity: 0.6; }
+  .tk.major { height: 9px; opacity: 1; }
+  .tl { position: absolute; top: 13px; left: 50%; transform: translateX(-50%); font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+  .tkhit:hover .tk { background: var(--accent); opacity: 1; }
+  .tkhit:hover .tl { color: var(--accent); }
+  .durslider.nostart .tkhit { cursor: default; }
+  .durslider.nostart .tkhit:hover .tk { background: var(--muted); opacity: 0.6; }
+  .durslider.nostart .tkhit:hover .tk.major { opacity: 1; }
+  .durslider.nostart .tkhit:hover .tl { color: var(--muted); }
+  .durval { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.8rem; color: var(--text); white-space: nowrap; line-height: 16px; pointer-events: none; }
   .durtext { position: absolute; left: 2px; top: 100%; margin-top: 3px; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
-  .durrow button { padding: 2px 10px; font-size: 0.85rem; font-weight: 500; }
   #impMsg { white-space: pre-line; margin-top: 0; margin-bottom: 14px; }
   .toast {
     position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30;
@@ -110,7 +137,6 @@
   }
   .toast[hidden] { display: none; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .selbar { display: flex; gap: 16px; justify-content: flex-end; margin: 0 0 8px; }
   .headleft { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   .selwrap { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 500; font-size: 0.92rem; cursor: pointer; }
   .selwrap input, .filemode input { width: auto; margin: 0; }
@@ -276,10 +302,6 @@
 
   <section id="panelEvents" role="tabpanel" aria-labelledby="tabEvents">
     <form id="form" autocomplete="off" novalidate>
-      <div class="selbar">
-        <button type="button" class="linkbtn" id="selAll" data-i18n="selAll"></button>
-        <button type="button" class="linkbtn" id="selNone" data-i18n="selNone"></button>
-      </div>
       <div id="events"></div>
       <div class="actions" style="margin-top:0">
         <div class="addwrap" id="addWrap">
@@ -440,7 +462,7 @@
       eTplDupName: "A template named “{name}” already exists.",
       btnImport: "Import .ics file",
       toastDeleted: "Event deleted.", btnUndo: "Undo",
-      fDuration: "Duration", d30: "30 min", d60: "1 h", d90: "1 h 30", d120: "2 h", d150: "2 h 30", d180: "3 h",
+      fDuration: "Duration", durNone: "No end time",
       durLabel: "Duration: {d}",
       eMidnight: "The end time must be on the same day as the start. This duration goes past midnight.",
       impOne: "Imported 1 event from {name}.", impMany: "Imported {n} events from {name}.",
@@ -463,7 +485,7 @@
       fReminder: "Reminder",
       rNone: "None", r15: "15 minutes before", r30: "30 minutes before", r60: "1 hour before", r1440: "1 day before",
       btnClear: "Clear all",
-      fInclude: "Include in download", selAll: "Select all", selNone: "Select none",
+      fInclude: "Include in download",
       fileModeLegend: "Files",
       modeCombined: "One file with the selected events", modeSeparate: "One file per selected event",
       genNone: "Generate .ics", genOne: "Generate 1 .ics file", genMany: "Generate {n} .ics files",
@@ -511,7 +533,7 @@
       eTplDupName: "「{name}」という名前のテンプレートはすでにあります。",
       btnImport: ".ics ファイルを読み込む",
       toastDeleted: "イベントを削除しました。", btnUndo: "元に戻す",
-      fDuration: "所要時間", d30: "30分", d60: "1時間", d90: "1時間30分", d120: "2時間", d150: "2時間30分", d180: "3時間",
+      fDuration: "所要時間", durNone: "終了時刻なし",
       durLabel: "所要時間: {d}",
       eMidnight: "終了時刻は開始と同じ日にしてください。この所要時間は午前0時を過ぎます。",
       impOne: "{name} から1件のイベントを読み込みました。", impMany: "{name} から{n}件のイベントを読み込みました。",
@@ -534,7 +556,7 @@
       fReminder: "リマインダー",
       rNone: "なし", r15: "15分前", r30: "30分前", r60: "1時間前", r1440: "1日前",
       btnClear: "すべてクリア",
-      fInclude: "ダウンロードに含める", selAll: "すべて選択", selNone: "選択を解除",
+      fInclude: "ダウンロードに含める",
       fileModeLegend: "ファイル",
       modeCombined: "選択したイベントを1つのファイルにまとめる", modeSeparate: "選択したイベントごとに1ファイル",
       genNone: ".ics を生成", genOne: ".ics ファイルを1個生成", genMany: ".ics ファイルを{n}個生成",
@@ -832,6 +854,20 @@
     return r;
   }
 
+  // Duration slider: 0 (no end time) to 300 min with 1-minute precision. Ticks: major every 30 min, minor every 15,
+  // labels every hour (filled in by syncDuration for the language). Clicking a tick sets that duration.
+  var DUR_MAX = 300, DUR_TICK = 15;
+  function durTicksHtml() {
+    var html = "", n = DUR_MAX / DUR_TICK;
+    for (var i = 0; i <= n; i++) {
+      var left = "calc(8px + (100% - 16px) * " + i + " / " + n + ")";
+      html += '<span class="tkhit" data-min="' + (i * DUR_TICK) + '" style="left:' + left + '">' +
+        '<span class="tk' + (i % 2 === 0 ? " major" : "") + '"></span>' +
+        (i % 4 === 0 ? '<span class="tl"></span>' : "") + '</span>';
+    }
+    return html;
+  }
+
   function cardHtml(n) {
     return '' +
       '<div class="cardhead"><div class="headleft"><h2 class="evtitle"></h2>' +
@@ -869,13 +905,12 @@
             '<div class="durtext" aria-live="polite"></div>' +
           '</div></div>' +
       '</div>' +
-      '<div class="durrow"><span class="hint" data-i18n="fDuration"></span>' +
-        '<button type="button" class="secondary small dur" data-min="30" data-i18n="d30"></button>' +
-        '<button type="button" class="secondary small dur" data-min="60" data-i18n="d60"></button>' +
-        '<button type="button" class="secondary small dur" data-min="90" data-i18n="d90"></button>' +
-        '<button type="button" class="secondary small dur" data-min="120" data-i18n="d120"></button>' +
-        '<button type="button" class="secondary small dur" data-min="150" data-i18n="d150"></button>' +
-        '<button type="button" class="secondary small dur" data-min="180" data-i18n="d180"></button>' +
+      '<div class="durrow"><span class="hint durlabel" data-i18n="fDuration"></span>' +
+        '<div class="durslider">' +
+          '<span class="durval" aria-hidden="true"></span>' +
+          '<input type="range" class="f-dur" min="0" max="300" step="1" value="0" disabled>' +
+          '<div class="ticks" aria-hidden="true">' + durTicksHtml() + '</div>' +
+        '</div>' +
       '</div>' +
       '<div class="note tznote"></div>' +
 
@@ -983,22 +1018,26 @@
       if (e.key === "Enter") { e.preventDefault(); commitTz(card); }
     });
 
-    // Duration buttons set the end time from the start time (same day only).
-    Array.prototype.forEach.call(card.querySelectorAll(".dur"), function (b) {
-      b.addEventListener("click", function () {
-        var sEl = q(card, ".f-start");
-        var st = parseTime(normTime(sEl.value) || sEl.value.trim());
-        if (!st) { sEl.focus(); return; }
-        var total = st[0] * 60 + st[1] + (+b.getAttribute("data-min"));
-        if (total >= 1440) {
-          card._msg = { key: "eMidnight", kind: "error" };
-          renderCardMsg(card);
-          return;
-        }
-        sEl.value = pad2(st[0]) + ":" + pad2(st[1]);
-        q(card, ".f-end").value = pad2(Math.floor(total / 60)) + ":" + pad2(total % 60);
-        update(card);
-      });
+    // Duration slider: sets the end time from the start time (same day only). 0 clears the end time.
+    // The end time box and the slider stay linked: syncDuration (run on every update) moves the slider.
+    function applyDuration(minutes) {
+      var sl = q(card, ".f-dur"), sEl = q(card, ".f-start");
+      var st = parseTime(normTime(sEl.value) || sEl.value.trim());
+      if (!st) { sl.value = 0; return; }
+      var startMin = st[0] * 60 + st[1];
+      var v = Math.min(minutes, 1439 - startMin); // never past midnight
+      sEl.value = pad2(st[0]) + ":" + pad2(st[1]);
+      var total = startMin + v;
+      q(card, ".f-end").value = v > 0 ? pad2(Math.floor(total / 60)) + ":" + pad2(total % 60) : "";
+      update(card);
+    }
+    q(card, ".f-dur").addEventListener("input", function () { applyDuration(+q(card, ".f-dur").value); });
+    // Ticks (and their labels) are click targets for a quick choice.
+    q(card, ".ticks").addEventListener("click", function (e) {
+      var hit = e.target.closest ? e.target.closest(".tkhit") : null;
+      if (!hit) return;
+      if (q(card, ".f-dur").disabled) { q(card, ".f-start").focus(); return; }
+      applyDuration(+hit.getAttribute("data-min"));
     });
 
     // Selection for download
@@ -1493,8 +1532,34 @@
     return h ? h + " h" + (m ? " " + pad2(m) : "") : m + " min";
   }
 
+  // Moves the slider to the card's duration (capped at the maximum).
+  // The slider is disabled without a valid start time and dimmed when the duration is above the maximum of the scale.
+  function syncDuration(card) {
+    var sl = q(card, ".f-dur");
+    var st = parseTime(normTime(q(card, ".f-start").value) || q(card, ".f-start").value.trim());
+    var d = cardDuration(card);
+    var v = d ? Math.min(DUR_MAX, d) : 0;
+    sl.disabled = !st;
+    q(card, ".durslider").classList.toggle("nostart", !st);
+    sl.value = v;
+    q(card, ".durslider").classList.toggle("off", !!d && d !== v);
+    var txt = d ? fmtDuration(d) : t("durNone");
+    var dv = q(card, ".durval");
+    dv.textContent = st ? txt : "";
+    dv.style.left = "calc(8px + (100% - 16px) * " + v + " / " + DUR_MAX + ")";
+    sl.setAttribute("aria-label", t("fDuration"));
+    sl.setAttribute("aria-valuetext", txt);
+    Array.prototype.forEach.call(card.querySelectorAll(".tkhit"), function (hit) {
+      var el = hit.querySelector(".tl");
+      if (!el) return;
+      var m = +hit.getAttribute("data-min");
+      el.textContent = m ? fmtDuration(m) : "0";
+    });
+  }
+
   function renderVerification(card) {
     var c = compute(card);
+    syncDuration(card);
     // Duration below the end time box, only when start and end are both valid.
     q(card, ".durtext").textContent = c.start && c.end
       ? t("durLabel", { d: fmtDuration(Math.round((c.end - c.start) / 60000)) }) : "";
@@ -2188,12 +2253,6 @@
       renderOutput();
     });
   });
-  function setAllSelected(v) {
-    cards().forEach(function (c) { q(c, ".f-sel").checked = v; });
-    renderOutput();
-  }
-  $("selAll").addEventListener("click", function () { setAllSelected(true); });
-  $("selNone").addEventListener("click", function () { setAllSelected(false); });
 
   // Clear: removes all events and leaves one empty event.
   // Saved settings (zone list, templates, language, theme) are kept.
