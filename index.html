@@ -100,7 +100,11 @@
   .cardbtns { display: flex; gap: 8px; }
   .durrow { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
   .durlabel { line-height: 20px; margin-top: 20px; }
-  .durslider { position: relative; flex: 1 1 200px; max-width: 500px; padding: 20px 0 26px; }
+  .durslider { --ext: 56px; --off: 46px; position: relative; flex: 1 1 200px; max-width: 540px; padding: 20px var(--ext) 26px 0; }
+  .durext, .durdot { display: none; position: absolute; pointer-events: none; }
+  .durext { left: calc(100% - var(--ext)); width: calc(var(--off) - 8px); top: 29px; border-top: 3px dotted var(--muted); }
+  .durdot { left: calc(100% - var(--ext) - 8px + var(--off) - 8px); top: 22px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); }
+  .durslider.over .durext, .durslider.over .durdot { display: block; }
   .durslider input[type=range] {
     -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 20px;
     margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer;
@@ -113,9 +117,9 @@
     -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--accent);
   }
   .durslider input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--accent); }
-  .durslider.off input[type=range]::-webkit-slider-thumb { background: var(--muted); }
-  .durslider.off input[type=range]::-moz-range-thumb { background: var(--muted); }
-  .ticks { position: absolute; left: 0; right: 0; top: 42px; height: 0; }
+  .durslider.over input[type=range]::-webkit-slider-thumb { background: transparent; }
+  .durslider.over input[type=range]::-moz-range-thumb { background: transparent; }
+  .ticks { position: absolute; left: 0; right: var(--ext); top: 42px; height: 0; }
   .tkhit { position: absolute; top: -2px; height: 32px; width: calc((100% - 16px) / 20); transform: translateX(-50%); cursor: pointer; }
   .tk { position: absolute; top: 2px; left: 50%; width: 1px; height: 5px; margin-left: -0.5px; background: var(--muted); opacity: 0.6; }
   .tk.major { height: 9px; opacity: 1; }
@@ -127,7 +131,6 @@
   .durslider.nostart .tkhit:hover .tk.major { opacity: 1; }
   .durslider.nostart .tkhit:hover .tl { color: var(--muted); }
   .durval { position: absolute; top: 0; transform: translateX(-50%); font-size: 0.8rem; color: var(--text); white-space: nowrap; line-height: 16px; pointer-events: none; }
-  .durtext { position: absolute; left: 2px; top: 100%; margin-top: 3px; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
   #impMsg { white-space: pre-line; margin-top: 0; margin-bottom: 14px; }
   .toast {
     position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30;
@@ -463,7 +466,6 @@
       btnImport: "Import .ics file",
       toastDeleted: "Event deleted.", btnUndo: "Undo",
       fDuration: "Duration", durNone: "No end time",
-      durLabel: "Duration: {d}",
       eMidnight: "The end time must be on the same day as the start. This duration goes past midnight.",
       impOne: "Imported 1 event from {name}.", impMany: "Imported {n} events from {name}.",
       impNone: "No events found in this file.", impBig: "The file is too large (maximum 2 MB).",
@@ -534,7 +536,6 @@
       btnImport: ".ics ファイルを読み込む",
       toastDeleted: "イベントを削除しました。", btnUndo: "元に戻す",
       fDuration: "所要時間", durNone: "終了時刻なし",
-      durLabel: "所要時間: {d}",
       eMidnight: "終了時刻は開始と同じ日にしてください。この所要時間は午前0時を過ぎます。",
       impOne: "{name} から1件のイベントを読み込みました。", impMany: "{name} から{n}件のイベントを読み込みました。",
       impNone: "このファイルにイベントが見つかりません。", impBig: "ファイルが大きすぎます(最大2 MB)。",
@@ -902,12 +903,12 @@
               'role="combobox" aria-autocomplete="none" aria-expanded="false" aria-controls="endList' + n + '">' +
             '<button type="button" class="tbtn" tabindex="-1" data-i18n-title="pickTime" aria-label="Times">▾</button>' +
             '<ul id="endList' + n + '" class="tlist" role="listbox" hidden></ul>' +
-            '<div class="durtext" aria-live="polite"></div>' +
           '</div></div>' +
       '</div>' +
       '<div class="durrow"><span class="hint durlabel" data-i18n="fDuration"></span>' +
         '<div class="durslider">' +
           '<span class="durval" aria-hidden="true"></span>' +
+          '<span class="durext" aria-hidden="true"></span><span class="durdot" aria-hidden="true"></span>' +
           '<input type="range" class="f-dur" min="0" max="300" step="1" value="0" disabled>' +
           '<div class="ticks" aria-hidden="true">' + durTicksHtml() + '</div>' +
         '</div>' +
@@ -1533,7 +1534,8 @@
   }
 
   // Moves the slider to the card's duration (capped at the maximum).
-  // The slider is disabled without a valid start time and dimmed when the duration is above the maximum of the scale.
+  // The slider is disabled without a valid start time. Above the maximum, the slider is prolonged by a dotted
+  // line and the indicator dot and duration are drawn at a constant distance from the maximum mark.
   function syncDuration(card) {
     var sl = q(card, ".f-dur");
     var st = parseTime(normTime(q(card, ".f-start").value) || q(card, ".f-start").value.trim());
@@ -1542,11 +1544,12 @@
     sl.disabled = !st;
     q(card, ".durslider").classList.toggle("nostart", !st);
     sl.value = v;
-    q(card, ".durslider").classList.toggle("off", !!d && d !== v);
+    q(card, ".durslider").classList.toggle("over", !!d && d > DUR_MAX);
     var txt = d ? fmtDuration(d) : t("durNone");
     var dv = q(card, ".durval");
     dv.textContent = st ? txt : "";
-    dv.style.left = "calc(8px + (100% - 16px) * " + v + " / " + DUR_MAX + ")";
+    dv.style.left = d > DUR_MAX ? "calc(100% - var(--ext) - 8px + var(--off))"
+      : "calc(8px + (100% - var(--ext) - 16px) * " + v + " / " + DUR_MAX + ")";
     sl.setAttribute("aria-label", t("fDuration"));
     sl.setAttribute("aria-valuetext", txt);
     Array.prototype.forEach.call(card.querySelectorAll(".tkhit"), function (hit) {
@@ -1560,9 +1563,6 @@
   function renderVerification(card) {
     var c = compute(card);
     syncDuration(card);
-    // Duration below the end time box, only when start and end are both valid.
-    q(card, ".durtext").textContent = c.start && c.end
-      ? t("durLabel", { d: fmtDuration(Math.round((c.end - c.start) / 60000)) }) : "";
     var tbody = q(card, ".vbody");
     tbody.innerHTML = "";
     var rows = [{ tz: c.tz, ref: true }];
