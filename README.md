@@ -45,3 +45,18 @@ The **Email text** tab gives you a ready-to-use subject and message for the sele
 Use the copy buttons, then paste them into your email.
 
 To change the wording, open **Template** on the same tab.
+
+<table>
+  <tr>
+    <td align="left">
+      <a href="https://0rwx.com/">
+      <img src="./AI-X-light.svg" width="40">
+      </a>
+    </td>
+    <td align="right">
+      <a href="https://0rwx.com/">
+        <img src="./AI-X-dark.svg" width="40">
+      </a>
+    </td>
+  </tr>
+</table>
