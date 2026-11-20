@@ -244,9 +244,11 @@
   td.rm { width: 1%; text-align: right; white-space: nowrap; }
   .reftag, .zid { color: var(--muted); font-size: 0.8rem; margin-left: 6px; }
   h2 { font-size: 1.05rem; margin: 0 0 10px; }
-  details.verify { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--border); }
-  details.verify summary, details.tpl summary { cursor: pointer; font-weight: 600; }
-  details.verify table { margin: 10px 0 6px; }
+  details.tpl summary { cursor: pointer; font-weight: 600; }
+  .zrows:empty { display: none; }
+  .zrow { margin-top: 8px; align-items: stretch; }
+  .zrow input { width: 100%; }
+  button.modzones { margin-top: 10px; }
   details.tpl { margin-top: 22px; padding-top: 10px; border-top: 1px solid var(--border); }
   .zoneadd { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .zoneadd input { flex: 1 1 200px; width: auto; }
@@ -492,7 +494,7 @@
       impRem: "Reminder not imported (unsupported value): {n}.",
       impTz: "Unknown time zone ({tz}); the time zone {def} was applied. Check these events.",
       impCap: "The limit of {max} events was reached; the remaining events were not imported.",
-      fTz: "Time zone", fTzHint: "(time zone name, e.g. Asia/Tokyo)",
+      fTz: "Time zone",
       fTitle: "Title", phTitle: "Team Meeting",
       fDate: "Date", fStart: "Start", fEnd: "End",
       pickDate: "Pick a date", pickTime: "Show times",
@@ -510,10 +512,8 @@
       sumOne: "Selected events: {sel} of {total} → 1 file: {names}",
       sumMany: "Selected events: {sel} of {total} → {n} files: {names}",
       filesReady: "Ready to download:", btnDownload: "Download",
-      verifyHeading: "Time in other zones",
-      btnModifyZones: "Modify time zones to check",
-      zonesDialogTitle: "Time zones to check",
-      thZone: "Zone", thTime: "Local time", refTag: "event zone",
+      btnModifyZones: "Add/Remove time zones",
+      zonesDialogTitle: "Time zones shown under each event",
       phZone: "Add time zone (e.g. America/Chicago)",
       btnAddZone: "Add", btnRestoreZones: "Restore default list", remove: "Remove", btnClose: "Close",
       theme: "Theme", themeSystem: "Auto (system)", themeLight: "Light", themeDark: "Dark",
@@ -562,7 +562,7 @@
       impRem: "リマインダーは読み込みませんでした(未対応の値): {n}件。",
       impTz: "不明なタイムゾーン({tz})のため、タイムゾーン {def} を適用しました。内容を確認してください。",
       impCap: "イベント数の上限({max}件)に達したため、残りは読み込みませんでした。",
-      fTz: "タイムゾーン", fTzHint: "(タイムゾーン名、例: Asia/Tokyo)",
+      fTz: "タイムゾーン",
       fTitle: "タイトル", phTitle: "チームミーティング",
       fDate: "日付", fStart: "開始", fEnd: "終了",
       pickDate: "日付を選択", pickTime: "時刻の一覧",
@@ -580,10 +580,8 @@
       sumOne: "選択中のイベント: {sel} / {total} → ファイル1個: {names}",
       sumMany: "選択中のイベント: {sel} / {total} → ファイル{n}個: {names}",
       filesReady: "ダウンロードの準備ができました:", btnDownload: "ダウンロード",
-      verifyHeading: "他のタイムゾーンでの時刻",
-      btnModifyZones: "確認するタイムゾーンを変更",
-      zonesDialogTitle: "確認するタイムゾーン",
-      thZone: "タイムゾーン", thTime: "現地時間", refTag: "イベントの時間帯",
+      btnModifyZones: "タイムゾーンを追加/削除",
+      zonesDialogTitle: "各イベントの下に表示するタイムゾーン",
       phZone: "タイムゾーンを追加(例: America/Chicago)",
       btnAddZone: "追加", btnRestoreZones: "初期リストに戻す", remove: "削除", btnClose: "閉じる",
       theme: "テーマ", themeSystem: "自動(システム)", themeLight: "ライト", themeDark: "ダーク",
@@ -897,7 +895,7 @@
       '<input id="title' + n + '" class="f-title" type="text" data-i18n-ph="phTitle">' +
 
       '<div class="row">' +
-        '<div><label for="tz' + n + '"><span data-i18n="fTz"></span> <span class="hint" data-i18n="fTzHint"></span></label>' +
+        '<div><label for="tz' + n + '" data-i18n="fTz"></label>' +
           '<input id="tz' + n + '" class="f-tz" type="text" list="tzlist" spellcheck="false" autocapitalize="off"></div>' +
         '<div><label for="date' + n + '" data-i18n="fDate"></label>' +
           '<div class="datewrap">' +
@@ -929,6 +927,9 @@
         '</div>' +
       '</div>' +
       '<div class="note tznote"></div>' +
+      // The other time zones: same fields as the event's zone, read-only, kept in step with it.
+      '<div class="zrows"></div>' +
+      '<button type="button" class="linkbtn modzones" data-i18n="btnModifyZones"></button>' +
 
       '<label for="location' + n + '"><span data-i18n="fLocation"></span> <span class="hint" data-i18n="fLocationHint"></span></label>' +
       '<input id="location' + n + '" class="f-location" type="text" placeholder="https://...">' +
@@ -945,13 +946,7 @@
         '<option value="1440" data-i18n="r1440"></option>' +
       '</select>' +
 
-      '<div class="msg cardmsg" role="alert"></div>' +
-
-      '<details class="verify"><summary data-i18n="verifyHeading"></summary>' +
-        '<table><thead><tr><th data-i18n="thZone"></th><th data-i18n="thTime"></th></tr></thead>' +
-        '<tbody class="vbody"></tbody></table>' +
-        '<button type="button" class="linkbtn modzones" data-i18n="btnModifyZones"></button>' +
-      '</details>';
+      '<div class="msg cardmsg" role="alert"></div>';
   }
 
   // Adds a card at the given position (appended when index is omitted).
@@ -1571,42 +1566,51 @@
       var el = hit.querySelector(".tl");
       if (!el) return;
       var m = +hit.getAttribute("data-min");
-      el.textContent = m ? fmtDuration(m) : "0";
+      el.textContent = m ? (m / 60) + "h" : "0"; // compact and the same in every language
     });
   }
 
   function renderVerification(card) {
     var c = compute(card);
     syncDuration(card);
-    var tbody = q(card, ".vbody");
-    tbody.innerHTML = "";
-    var rows = [{ tz: c.tz, ref: true }];
-    settings.zones.forEach(function (z) { if (z !== c.tz) rows.push({ tz: z, ref: false }); });
-
-    rows.forEach(function (row) {
-      var tr = document.createElement("tr");
-      var a = document.createElement("td");
-      var b = document.createElement("td");
-      a.textContent = zoneLabel(row.tz);
-      if (row.ref) {
-        var tag = document.createElement("span");
-        tag.className = "reftag";
-        tag.textContent = "(" + t("refTag") + ")";
-        a.appendChild(tag);
-      }
-      if (c.start) {
-        var s = zoneParts(c.start, row.tz, lang);
-        var txt = s.date + " (" + s.wd + ") " + s.time;
-        if (c.end) {
-          var e = zoneParts(c.end, row.tz, lang);
-          txt += " – " + (e.date !== s.date ? e.date + " " : "") + e.time;
-        }
-        b.textContent = txt + " (" + s.tz + ")";
-      } else {
-        b.textContent = "–";
-      }
-      tr.appendChild(a); tr.appendChild(b);
-      tbody.appendChild(tr);
+    var wrap = q(card, ".zrows");
+    var tzs = settings.zones.filter(function (z) { return z !== c.tz; });
+    var key = tzs.join("|");
+    if (card._zkey !== key) { // rebuild only when the zone list (or the event's zone) changed
+      card._zkey = key;
+      wrap.innerHTML = "";
+      tzs.forEach(function (tz) {
+        var row = document.createElement("div");
+        row.className = "row zrow";
+        row.setAttribute("data-tz", tz);
+        ["tz", "date", "start", "end"].forEach(function (f) {
+          var box = document.createElement("div");
+          var inp = document.createElement("input");
+          inp.type = "text";
+          inp.readOnly = true;
+          inp.className = "z-" + f;
+          if (f === "tz") inp.value = tz;
+          box.appendChild(inp);
+          row.appendChild(box);
+        });
+        wrap.appendChild(row);
+      });
+    }
+    Array.prototype.forEach.call(wrap.children, function (row) {
+      var tz = row.getAttribute("data-tz");
+      var s = c.start ? zoneParts(c.start, tz, lang) : null;
+      var e = c.start && c.end ? zoneParts(c.end, tz, lang) : null;
+      var ds = q(row, ".z-date"), st = q(row, ".z-start"), en = q(row, ".z-end");
+      ds.value = s ? s.date : "";
+      st.value = s ? s.time : "";
+      // An end on another date than the start (in this zone) is shown with its date.
+      en.value = e ? (e.date !== s.date ? e.date + " " : "") + e.time : "";
+      q(row, ".z-tz").setAttribute("aria-label", t("fTz") + ": " + tz);
+      ds.setAttribute("aria-label", t("fDate") + " (" + tz + ")");
+      st.setAttribute("aria-label", t("fStart") + " (" + tz + ")");
+      en.setAttribute("aria-label", t("fEnd") + " (" + tz + ")");
+      var show = s ? s.tz : "";
+      row.title = show ? zoneLabel(tz) + " (" + show + ")" : zoneLabel(tz);
     });
   }
 
