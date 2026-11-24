@@ -95,7 +95,7 @@
     background: var(--card); border: 1px solid var(--border);
     border-radius: 10px; padding: 20px; margin-bottom: 16px;
   }
-  .cardhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .cardhead { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 4px; }
   .cardhead h2 { margin: 0; }
   .cardbtns { display: flex; gap: 8px; }
   .durrow { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
@@ -141,8 +141,7 @@
   .toast[hidden] { display: none; }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   .headleft { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .selwrap { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 500; font-size: 0.92rem; cursor: pointer; }
-  .selwrap input, .filemode input { width: auto; margin: 0; }
+  .filemode input { width: auto; margin: 0; }
   .evcard.excluded { border-style: dashed; }
   .filemode { border: 0; padding: 0; margin: 18px 0 0; }
   .filemode legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
@@ -223,12 +222,47 @@
   }
   .sheet .card { background: transparent; }
   #panelEmail > .card { border: 0; padding: 0; margin: 0; background: transparent; }
-  .sheet .evcard:last-of-type { margin-bottom: 16px; }
+  .dlevents { border: 0; padding: 0; margin: 0; }
+  .dlevents legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
+  .dlrow { display: flex; align-items: baseline; gap: 10px; margin: 6px 0; padding: 8px 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); border-radius: 8px; }
+  .dlrow input { width: auto; margin: 0; align-self: center; }
+  .dlnum { color: var(--muted); min-width: 1.5em; font-weight: 600; }
+  .dltitle { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .dltitle.empty { color: var(--muted); font-style: italic; font-weight: 400; }
+  .dlsub { color: var(--muted); font-size: 0.85rem; font-weight: 400; white-space: nowrap; }
+  .dlrow.off .dltitle { color: var(--muted); }
+  .dlrow.err .dlnum::after { content: "!"; margin-left: 4px; color: var(--danger); font-weight: 700; }
+  .evlayout { display: flex; align-items: flex-start; margin-bottom: 16px; }
+  .evtabs { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; padding-top: 0; position: relative; z-index: 1; }
+  .evpane { flex: 1 1 auto; min-width: 0; }
+  .evpane .evcard { margin: 0; border-radius: 0 10px 10px 10px; }
+  .card[hidden] { display: none; }
+  button.evtab {
+    position: relative; min-width: 44px; padding: 10px 12px; margin: 0 6px 0 0; font-weight: 600; text-align: center;
+    color: var(--muted); background: color-mix(in srgb, var(--card) 62%, var(--border));
+    border: 1px solid var(--border); border-radius: 10px 0 0 10px;
+  }
+  button.evtab:hover { color: var(--text); }
+  button.evtab[aria-selected="true"] {
+    margin-right: -1px; padding-right: 17px; color: var(--text); font-weight: 700;
+    background: var(--card); border-right-color: var(--card);
+  }
+  button.evtab.excluded { opacity: 0.55; }
+  button.evtab.err::after {
+    content: "!"; position: absolute; top: -6px; left: -6px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--danger); color: var(--card); font-size: 0.7rem; font-weight: 700; line-height: 16px; text-align: center;
+  }
+  button.evtab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
   .setsel { max-width: 320px; }
   @media (max-width: 520px) {
     .sheet { padding: 12px; }
     .sheet .evcard { padding: 14px; }
-    button.tab { padding: 8px 12px; }
+    .tabs { gap: 3px; }
+    button.tab { padding: 8px 9px; font-size: 0.9rem; }
+    button.tab-settings span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    button.evtab { min-width: 34px; padding: 10px 8px; }
+    button.evtab[aria-selected="true"] { padding-right: 13px; }
   }
   [role="tabpanel"][hidden] { display: none; }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
@@ -297,6 +331,7 @@
   <div class="book">
   <div class="tabs" role="tablist">
     <button type="button" class="tab" role="tab" id="tabEvents" aria-controls="panelEvents" aria-selected="true" data-i18n="tabEvents"></button>
+    <button type="button" class="tab" role="tab" id="tabDownload" aria-controls="panelDownload" aria-selected="false" tabindex="-1" data-i18n="tabDownload"></button>
     <button type="button" class="tab" role="tab" id="tabEmail" aria-controls="panelEmail" aria-selected="false" tabindex="-1" data-i18n="tabEmail"></button>
     <button type="button" class="tab tab-settings" role="tab" id="tabSettings" aria-controls="panelSettings" aria-selected="false" tabindex="-1">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -310,7 +345,10 @@
   <div class="sheet">
   <section id="panelEvents" role="tabpanel" aria-labelledby="tabEvents">
     <form id="form" autocomplete="off" novalidate>
-      <div id="events"></div>
+      <div class="evlayout">
+        <div class="evtabs" id="evTabs" role="tablist" aria-orientation="vertical"></div>
+        <div class="evpane"><div id="events"></div></div>
+      </div>
       <div class="actions" style="margin-top:0">
         <div class="addwrap" id="addWrap">
           <button type="button" class="secondary" id="addEvent" aria-haspopup="true" aria-expanded="false" aria-controls="addMenu"><span data-i18n="btnAddEvent"></span> ▾</button>
@@ -318,20 +356,27 @@
         </div>
         <button type="button" class="secondary" id="importIcs" data-i18n="btnImport"></button>
         <input type="file" id="icsFile" accept=".ics,text/calendar" hidden>
-      </div>
-      <div id="impMsg" class="msg" role="status"></div>
-      <fieldset class="filemode">
-        <legend data-i18n="fileModeLegend"></legend>
-        <label><input type="radio" name="fileMode" value="combined"> <span data-i18n="modeCombined"></span></label>
-        <label><input type="radio" name="fileMode" value="separate"> <span data-i18n="modeSeparate"></span></label>
-      </fieldset>
-      <p class="summary" id="dlSummary" aria-live="polite"></p>
-      <div class="actions">
-        <button type="submit" id="genBtn"></button>
         <button type="button" class="secondary" id="clearBtn" data-i18n="btnClear"></button>
       </div>
-      <div id="fileList" aria-live="polite"></div>
+      <div id="impMsg" class="msg" role="status"></div>
     </form>
+  </section>
+
+  <section id="panelDownload" role="tabpanel" aria-labelledby="tabDownload" hidden>
+    <fieldset class="dlevents">
+      <legend data-i18n="dlEventsLegend"></legend>
+      <div id="dlList"></div>
+    </fieldset>
+    <fieldset class="filemode">
+      <legend data-i18n="fileModeLegend"></legend>
+      <label><input type="radio" name="fileMode" value="combined"> <span data-i18n="modeCombined"></span></label>
+      <label><input type="radio" name="fileMode" value="separate"> <span data-i18n="modeSeparate"></span></label>
+    </fieldset>
+    <p class="summary" id="dlSummary" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" id="genBtn"></button>
+    </div>
+    <div id="fileList" aria-live="polite"></div>
   </section>
 
   <section id="panelEmail" role="tabpanel" aria-labelledby="tabEmail" hidden>
@@ -469,7 +514,7 @@
     en: {
       pageTitle: "Calendar Invite Generator",
       heading: "Calendar Invite Generator",
-      tabEvents: "Events", tabEmail: "Email text", tabSettings: "Settings", setLanguage: "Language",
+      tabEvents: "Events", tabDownload: "Download", tabEmail: "Email text", tabSettings: "Settings", setLanguage: "Language",
       eventN: "Event {n}",
       btnAddEvent: "Add event", btnDeleteEvent: "Delete event",
       menuNew: "New event", menuDup: "Duplicate last event", menuManage: "Manage templates…",
@@ -504,10 +549,10 @@
       fReminder: "Reminder",
       rNone: "None", r15: "15 minutes before", r30: "30 minutes before", r60: "1 hour before", r1440: "1 day before",
       btnClear: "Clear all",
-      fInclude: "Include in download",
+      dlEventsLegend: "Events to download",
       fileModeLegend: "Files",
       modeCombined: "One file with the selected events", modeSeparate: "One file per selected event",
-      genNone: "Generate .ics", genOne: "Generate 1 .ics file", genMany: "Generate {n} .ics files",
+      genNone: "Generate .ics", genSingle: "Generate .ics file", genOne: "Generate 1 .ics file", genMany: "Generate {n} .ics files",
       sumNone: "No event selected.",
       sumOne: "Selected events: {sel} of {total} → 1 file: {names}",
       sumMany: "Selected events: {sel} of {total} → {n} files: {names}",
@@ -537,7 +582,7 @@
     ja: {
       pageTitle: "カレンダー招待ジェネレーター",
       heading: "カレンダー招待ジェネレーター",
-      tabEvents: "イベント", tabEmail: "メール文面", tabSettings: "設定", setLanguage: "言語",
+      tabEvents: "イベント", tabDownload: "ダウンロード", tabEmail: "メール文面", tabSettings: "設定", setLanguage: "言語",
       eventN: "イベント {n}",
       btnAddEvent: "イベントを追加", btnDeleteEvent: "イベントを削除",
       menuNew: "新規イベント", menuDup: "最後のイベントを複製", menuManage: "テンプレートを管理…",
@@ -572,10 +617,10 @@
       fReminder: "リマインダー",
       rNone: "なし", r15: "15分前", r30: "30分前", r60: "1時間前", r1440: "1日前",
       btnClear: "すべてクリア",
-      fInclude: "ダウンロードに含める",
+      dlEventsLegend: "ダウンロードするイベント",
       fileModeLegend: "ファイル",
       modeCombined: "選択したイベントを1つのファイルにまとめる", modeSeparate: "選択したイベントごとに1ファイル",
-      genNone: ".ics を生成", genOne: ".ics ファイルを1個生成", genMany: ".ics ファイルを{n}個生成",
+      genNone: ".ics を生成", genSingle: ".ics ファイルを生成", genOne: ".ics ファイルを1個生成", genMany: ".ics ファイルを{n}個生成",
       sumNone: "イベントが選択されていません。",
       sumOne: "選択中のイベント: {sel} / {total} → ファイル1個: {names}",
       sumMany: "選択中のイベント: {sel} / {total} → ファイル{n}個: {names}",
@@ -801,7 +846,7 @@
   // Event data is saved in the browser on every change and restored on load.
   // "Clear all" is the only action that removes it.
   var EVENTS_KEY = "icsEvents";
-  var MAX_EVENTS = 50;
+  var MAX_EVENTS = 20;
   // Plain data of one card (used for saving, duplicating, undoing a deletion).
   function readCard(card) {
     return {
@@ -884,8 +929,8 @@
 
   function cardHtml(n) {
     return '' +
-      '<div class="cardhead"><div class="headleft"><h2 class="evtitle"></h2>' +
-      '<label class="selwrap"><input type="checkbox" class="f-sel" checked> <span data-i18n="fInclude"></span></label></div>' +
+      '<div class="cardhead"><div class="headleft">' +
+      '<input type="checkbox" class="f-sel" checked hidden></div>' +
       '<div class="cardbtns">' +
         '<button type="button" class="secondary small tplsave" data-i18n="btnTplSave"></button>' +
         '<button type="button" class="secondary small del" data-i18n="btnDeleteEvent"></button>' +
@@ -954,6 +999,8 @@
     var n = ++seq;
     var card = document.createElement("section");
     card.className = "card evcard";
+    card.id = "evpanel" + n;
+    card.setAttribute("role", "tabpanel");
     card.innerHTML = cardHtml(n);
     card.dataset.tz = tz;
     var ref = typeof index === "number" ? cards()[index] : null;
@@ -965,14 +1012,64 @@
     return card;
   }
 
+  // Vertical event tabs: one tab per event (its number); only the selected event is shown.
+  var activeCard = null;
+  function setActive(card) {
+    if (!card || cards().indexOf(card) < 0) return;
+    activeCard = card;
+    syncEvTabs();
+  }
+  function syncEvTabs() {
+    var all = cards();
+    if (all.indexOf(activeCard) < 0) activeCard = all[0] || null;
+    all.forEach(function (card) {
+      var on = card === activeCard, b = card._tab;
+      card.hidden = !on;
+      if (!b) return;
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      b.tabIndex = on ? 0 : -1;
+      b.classList.toggle("excluded", !q(card, ".f-sel").checked); // not included in the download
+      b.classList.toggle("err", !!(card._msg && card._msg.kind === "error"));
+    });
+    renderDlList();
+  }
+  function renderEvTabs() {
+    var box = $("evTabs");
+    box.innerHTML = "";
+    cards().forEach(function (card, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "evtab";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-label", t("eventN", { n: i + 1 }));
+      b.setAttribute("aria-controls", card.id);
+      b.textContent = String(i + 1);
+      b.addEventListener("click", function () { setActive(card); });
+      card._tab = b;
+      box.appendChild(b);
+    });
+    syncEvTabs();
+  }
+  $("evTabs").addEventListener("keydown", function (e) {
+    var all = cards(), i = all.indexOf(activeCard), to = -1;
+    if (e.key === "ArrowDown") to = (i + 1) % all.length;
+    else if (e.key === "ArrowUp") to = (i - 1 + all.length) % all.length;
+    else if (e.key === "Home") to = 0;
+    else if (e.key === "End") to = all.length - 1;
+    if (to < 0) return;
+    e.preventDefault();
+    setActive(all[to]);
+    all[to]._tab.focus();
+  });
+
   function numberCards() {
     var all = cards(), full = all.length >= MAX_EVENTS;
     all.forEach(function (card, i) {
-      q(card, ".evtitle").textContent = t("eventN", { n: i + 1 });
-      q(card, ".del").style.display = i === 0 ? "none" : "";
+      q(card, ".del").style.display = all.length < 2 ? "none" : ""; // the last remaining event cannot be deleted
     });
     $("addEvent").disabled = full;
     if (full) setAddMenuOpen(false);
+    renderEvTabs();
   }
 
   function wireCard(card) {
@@ -1052,15 +1149,18 @@
     });
 
     // Selection for download
-    q(card, ".f-sel").addEventListener("change", renderOutput);
+    q(card, ".f-sel").addEventListener("change", function () { syncEvTabs(); renderOutput(); });
 
     // Save as template
     q(card, ".tplsave").addEventListener("click", function () { openTplDialog(card); });
 
     // Delete (with undo) and zone dialog
     q(card, ".del").addEventListener("click", function () {
+      if (cards().length < 2) return;
       var state = { ev: readCard(card), index: cards().indexOf(card) };
       card.parentNode.removeChild(card);
+      var rest = cards();
+      activeCard = rest[Math.min(state.index, rest.length - 1)]; // the next event, or the previous one
       numberCards();
       renderOutput();
       showToast(state);
@@ -1266,6 +1366,7 @@
     if (!s || cards().length >= MAX_EVENTS) return;
     var card = restoreCard(s.ev, s.index);
     update(card);
+    setActive(card);
     if (card.scrollIntoView) card.scrollIntoView({ block: "nearest" });
   });
 
@@ -1335,20 +1436,66 @@
     });
   }
 
+  // Events to download: one checkbox row per event (the checkbox of the event is the stored state).
+  function renderDlList() {
+    var box = $("dlList"), all = cards();
+    var same = box.children.length === all.length && all.every(function (c, i) { return box.children[i]._card === c; });
+    if (!same) {
+      box.innerHTML = "";
+      all.forEach(function (card) {
+        var row = document.createElement("label");
+        row.className = "dlrow";
+        row._card = card;
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.addEventListener("change", function () {
+          var st = q(card, ".f-sel");
+          st.checked = cb.checked;
+          st.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        var num = document.createElement("span"), ttl = document.createElement("span"), sub = document.createElement("span");
+        num.className = "dlnum"; ttl.className = "dltitle"; sub.className = "dlsub";
+        row.appendChild(cb); row.appendChild(num); row.appendChild(ttl); row.appendChild(sub);
+        box.appendChild(row);
+      });
+    }
+    all.forEach(function (card, i) {
+      var row = box.children[i], title = q(card, ".f-title").value.trim();
+      var d = normDate(q(card, ".f-date").value) || q(card, ".f-date").value.trim();
+      var st = normTime(q(card, ".f-start").value) || q(card, ".f-start").value.trim();
+      var on = q(card, ".f-sel").checked;
+      row.querySelector("input").checked = on;
+      row.querySelector(".dlnum").textContent = String(i + 1);
+      var ttl = row.querySelector(".dltitle");
+      ttl.textContent = title || t("eventN", { n: i + 1 });
+      ttl.classList.toggle("empty", !title);
+      row.querySelector(".dlsub").textContent = parseDate(d) ? d + (parseTime(st) ? " " + st : "") : "";
+      row.classList.toggle("off", !on);
+      row.classList.toggle("err", !!(card._msg && card._msg.kind === "error"));
+    });
+  }
+
   // Summary line, Generate button label, file layout choice, excluded-event styling and file list.
   function renderGenUi() {
-    var all = cards(), sel = selectedCards(), names = plannedNames(sel);
+    var all = cards();
+    if (all.length === 1) q(all[0], ".f-sel").checked = true; // a single event is always included
+    var sel = selectedCards(), names = plannedNames(sel), single = all.length === 1;
+    // With one event the Download tab is just the Generate button.
+    document.querySelector(".dlevents").hidden = single;
+    document.querySelector(".filemode").hidden = single;
+    $("dlSummary").hidden = single;
     all.forEach(function (c) { c.classList.toggle("excluded", !q(c, ".f-sel").checked); });
     Array.prototype.forEach.call(document.querySelectorAll('input[name="fileMode"]'), function (r) {
       r.checked = r.value === settings.fileMode;
     });
     var btn = $("genBtn");
     btn.disabled = !sel.length;
-    btn.textContent = !sel.length ? t("genNone") : names.length === 1 ? t("genOne") : t("genMany", { n: names.length });
+    btn.textContent = single ? t("genSingle") : !sel.length ? t("genNone") : names.length === 1 ? t("genOne") : t("genMany", { n: names.length });
     var shown = names.length > 3 ? names.slice(0, 3).join(", ") + ", …" : names.join(", ");
     $("dlSummary").textContent = !sel.length ? t("sumNone")
       : t(names.length === 1 ? "sumOne" : "sumMany", { sel: sel.length, total: all.length, n: names.length, names: shown });
     if (generated && generated.sig !== genSig()) generated = null; // data changed after generating
+    renderDlList();
     renderFileList();
   }
 
@@ -1517,14 +1664,16 @@
     var added = take.map(function (ev) { return restoreCard(ev); });
     numberCards();
     added.forEach(update);
+    setActive(added[0]);
     if (added[0].scrollIntoView) added[0].scrollIntoView({ block: "nearest" });
   }
 
   function renderCardMsg(card) {
     var el = q(card, ".cardmsg"), s = card._msg;
-    if (!s) { el.textContent = ""; el.className = "msg cardmsg"; return; }
+    if (!s) { el.textContent = ""; el.className = "msg cardmsg"; syncEvTabs(); return; }
     el.textContent = t(s.key, s.args);
     el.className = "msg cardmsg " + s.kind;
+    syncEvTabs();
   }
 
   function setNote(el, key, args) { el._note = key ? { key: key, args: args } : null; renderNoteEl(el); }
@@ -1858,7 +2007,7 @@
 
   /* ---------- tabs ---------- */
 
-  var TAB_IDS = ["events", "email", "settings"];
+  var TAB_IDS = ["events", "download", "email", "settings"];
   function tabEl(id) { return $("tab" + id.charAt(0).toUpperCase() + id.slice(1)); }
   function panelEl(id) { return $("panel" + id.charAt(0).toUpperCase() + id.slice(1)); }
   function showTab(which) {
@@ -1926,6 +2075,7 @@
   }
   function finishAdd(card) {
     update(card);
+    setActive(card);
     saveEvents();
     q(card, ".f-title").focus();
     if (card.scrollIntoView) card.scrollIntoView({ block: "nearest" });
@@ -2194,8 +2344,8 @@
 
   // Generate: only the selected events are checked. Blocked until all of them are valid;
   // the first invalid card is scrolled into view. Nothing is downloaded until a Download button is used.
-  $("form").addEventListener("submit", function (e) {
-    e.preventDefault();
+  $("form").addEventListener("submit", function (e) { e.preventDefault(); });
+  $("genBtn").addEventListener("click", function () {
     var sel = selectedCards();
     if (!sel.length) return;
     var evs = [], firstBad = null;
@@ -2208,6 +2358,8 @@
     });
     renderOutput();
     if (firstBad) {
+      showTab("events");
+      setActive(firstBad);
       if (firstBad.scrollIntoView) firstBad.scrollIntoView({ block: "center" });
       return;
     }
