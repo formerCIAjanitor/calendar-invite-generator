@@ -226,6 +226,9 @@
   }
   .sheet .card { background: transparent; }
   #panelEmail > .card { border: 0; padding: 0; margin: 0; background: transparent; }
+  .dlissue { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0; padding: 8px 12px;
+    border-radius: 8px; background: var(--error-bg); color: var(--error-text); }
+  .dlissue button { flex: 0 0 auto; color: inherit; font-weight: 600; text-decoration: underline; }
   .dlevents { border: 0; padding: 0; margin: 0; }
   .dlevents legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
   .dlrow { display: flex; align-items: baseline; gap: 10px; margin: 6px 0; padding: 8px 12px; font-weight: 500; cursor: pointer;
@@ -378,6 +381,7 @@
       <label><input type="radio" name="fileMode" value="separate"> <span data-i18n="modeSeparate"></span></label>
     </fieldset>
     <p class="summary" id="dlSummary" aria-live="polite"></p>
+    <div id="dlIssues" role="status"></div>
     <div class="actions">
       <button type="button" id="genBtn"></button>
     </div>
@@ -553,7 +557,7 @@
       fDesc: "Description", fDescHint: "(agenda, notes)",
       fReminder: "Reminder",
       rNone: "None", r15: "15 minutes before", r30: "30 minutes before", r60: "1 hour before", r1440: "1 day before",
-      dlEventsLegend: "Events to download",
+      dlEventsLegend: "Events to download", dlMissing: "Missing: {list}.", dlFix: "Fix",
       fileModeLegend: "Files",
       modeCombined: "One file with the selected events", modeSeparate: "One file per selected event",
       genNone: "Generate .ics", genSingle: "Generate .ics file", genOne: "Generate 1 .ics file", genMany: "Generate {n} .ics files",
@@ -620,7 +624,7 @@
       fDesc: "説明", fDescHint: "(アジェンダ、メモ)",
       fReminder: "リマインダー",
       rNone: "なし", r15: "15分前", r30: "30分前", r60: "1時間前", r1440: "1日前",
-      dlEventsLegend: "ダウンロードするイベント",
+      dlEventsLegend: "ダウンロードするイベント", dlMissing: "未入力: {list}。", dlFix: "修正する",
       fileModeLegend: "ファイル",
       modeCombined: "選択したイベントを1つのファイルにまとめる", modeSeparate: "選択したイベントごとに1ファイル",
       genNone: ".ics を生成", genSingle: ".ics ファイルを生成", genOne: ".ics ファイルを1個生成", genMany: ".ics ファイルを{n}個生成",
@@ -1435,6 +1439,51 @@
     });
   }
 
+  // What stops this event from being generated: required fields (title, date, start time) or an error
+  // already shown on the event. Returns "" when there is nothing.
+  function cardIssue(card) {
+    var miss = [];
+    if (!q(card, ".f-title").value.trim()) miss.push(t("fTitle"));
+    if (!q(card, ".f-date").value.trim()) miss.push(t("fDate"));
+    if (!q(card, ".f-start").value.trim()) miss.push(t("fStart"));
+    if (miss.length) return t("dlMissing", { list: miss.join(lang === "ja" ? "、" : ", ") });
+    if (card._msg && card._msg.kind === "error") return t(card._msg.key, card._msg.args);
+    return "";
+  }
+  function goToEvent(card) {
+    showTab("events");
+    setActive(card);
+    var f = [".f-title", ".f-date", ".f-start"].filter(function (c) { return !q(card, c).value.trim(); })[0] || ".f-title";
+    q(card, f).focus();
+  }
+  // Notices on the Download tab for the selected events that cannot be generated yet.
+  function renderDlIssues() {
+    var all = cards(), box = $("dlIssues"), found = [];
+    selectedCards().forEach(function (card) {
+      var msg = cardIssue(card);
+      if (msg) found.push({ card: card, text: (all.length > 1 ? t("eventN", { n: all.indexOf(card) + 1 }) + " – " : "") + msg });
+    });
+    var sig = found.map(function (f) { return all.indexOf(f.card) + f.text; }).join("\n") + "|" + lang;
+    if (box._sig !== sig) {
+      box._sig = sig;
+      box.innerHTML = "";
+      found.forEach(function (f) {
+        var row = document.createElement("div");
+        row.className = "dlissue";
+        var span = document.createElement("span");
+        span.textContent = f.text;
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "linkbtn";
+        b.textContent = t("dlFix");
+        b.addEventListener("click", function () { goToEvent(f.card); });
+        row.appendChild(span); row.appendChild(b);
+        box.appendChild(row);
+      });
+    }
+    return found.length;
+  }
+
   // Events to download: one checkbox row per event (the checkbox of the event is the stored state).
   function renderDlList() {
     var box = $("dlList"), all = cards();
@@ -1470,7 +1519,7 @@
       ttl.classList.toggle("empty", !title);
       row.querySelector(".dlsub").textContent = parseDate(d) ? d + (parseTime(st) ? " " + st : "") : "";
       row.classList.toggle("off", !on);
-      row.classList.toggle("err", !!(card._msg && card._msg.kind === "error"));
+      row.classList.toggle("err", on && !!cardIssue(card));
     });
   }
 
@@ -1488,7 +1537,8 @@
       r.checked = r.value === settings.fileMode;
     });
     var btn = $("genBtn");
-    btn.disabled = !sel.length;
+    var blocked = renderDlIssues(); // required fields missing: say so here, before the button is used
+    btn.disabled = !sel.length || blocked > 0;
     btn.textContent = single ? t("genSingle") : !sel.length ? t("genNone") : names.length === 1 ? t("genOne") : t("genMany", { n: names.length });
     var shown = names.length > 3 ? names.slice(0, 3).join(", ") + ", …" : names.join(", ");
     $("dlSummary").textContent = !sel.length ? t("sumNone")
