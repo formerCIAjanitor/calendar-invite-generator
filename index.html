@@ -273,6 +273,17 @@
   }
   [role="tabpanel"][hidden] { display: none; }
   .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  /* Row under the events: one line at every width. Buttons shrink and wrap their text onto two lines,
+     and Delete event stays at the right edge. */
+  .evactions { flex-wrap: nowrap; align-items: stretch; }
+  .evactions > button, .evactions > .addwrap { flex: 0 1 auto; min-width: min-content; }
+  .evactions .addwrap { display: flex; }
+  /* keep-all: Japanese text breaks only at the zero-width spaces put in the labels, never inside a word */
+  .evactions button { white-space: normal; word-break: keep-all; overflow-wrap: normal; line-height: 1.25; padding: 8px 14px; text-align: center; }
+  .evactions .addwrap > button { flex: 1 1 auto; }
+  .evactions #delBtn { margin-left: auto; }
+  @media (max-width: 380px) { .evactions button { font-size: 0.75rem; padding: 6px 3px; } }
+  @media (max-width: 520px) { .evactions { gap: 4px; } .evactions button { padding: 6px 4px; font-size: 0.82rem; } }
   .msg { padding: 10px 12px; border-radius: 6px; margin-top: 14px; display: none; }
   .msg.error { background: var(--error-bg); color: var(--error-text); display: block; }
   .msg.ok { background: var(--ok-bg); display: block; }
@@ -356,7 +367,7 @@
         <div class="evtabs" id="evTabs" role="tablist" aria-orientation="vertical"></div>
         <div class="evpane"><div id="events"></div></div>
       </div>
-      <div class="actions" style="margin-top:0">
+      <div class="actions evactions" style="margin-top:0">
         <div class="addwrap" id="addWrap">
           <button type="button" class="secondary" id="addEvent" aria-haspopup="true" aria-expanded="false" aria-controls="addMenu"><span data-i18n="btnAddEvent"></span> ▾</button>
           <ul id="addMenu" hidden></ul>
@@ -592,16 +603,16 @@
       heading: "カレンダー招待ジェネレーター",
       tabEvents: "イベント", tabDownload: "ダウンロード", tabEmail: "メール文面", tabSettings: "設定", setLanguage: "言語",
       eventN: "イベント {n}",
-      btnAddEvent: "イベントを追加", btnDeleteEvent: "イベントを削除",
+      btnAddEvent: "イベント\u200b追加", btnDeleteEvent: "イベント\u200b削除",
       menuNew: "新規イベント", menuDup: "最後のイベントを複製", menuManage: "テンプレートを管理…",
-      btnTplSave: "テンプレートとして保存", btnSave: "保存", btnCancel: "キャンセル",
+      btnTplSave: "テンプレート\u200b保存", btnSave: "保存", btnCancel: "キャンセル",
       tplDlgTitle: "テンプレートとして保存", tplName: "テンプレート名", phTplName: "例: 定例ミーティング",
       tplFields: "保存する項目",
       eTplName: "テンプレート名を入力してください。", eTplNone: "項目を1つ以上選択してください。",
       eTplLimit: "テンプレートは最大{n}件です。先に「テンプレートを管理」で削除してください。",
       mgrTitle: "テンプレートの管理", mgrEmpty: "保存されたテンプレートはありません。", mgrRename: "テンプレート名",
       eTplDupName: "「{name}」という名前のテンプレートはすでにあります。",
-      btnImport: ".ics ファイルを読み込む",
+      btnImport: ".ics 読み込み",
       toastDeleted: "イベントを削除しました。", btnUndo: "元に戻す",
       fDuration: "所要時間", durNone: "終了時刻なし",
       eMidnight: "終了時刻は開始と同じ日にしてください。この所要時間は午前0時を過ぎます。",
