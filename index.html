@@ -95,6 +95,10 @@
     background: var(--card); border: 1px solid var(--border);
     border-radius: 10px; padding: 20px; margin-bottom: 16px;
   }
+  button.secondary.danger { color: var(--danger); border-color: var(--danger); }
+  button.secondary.danger:hover:not(:disabled) { background: var(--danger); color: var(--card); }
+  button.secondary.danger:focus-visible { outline-color: var(--danger); }
+  button[hidden] { display: none; }
   .cardhead { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 4px; }
   .cardhead h2 { margin: 0; }
   .cardbtns { display: flex; gap: 8px; }
@@ -356,7 +360,8 @@
         </div>
         <button type="button" class="secondary" id="importIcs" data-i18n="btnImport"></button>
         <input type="file" id="icsFile" accept=".ics,text/calendar" hidden>
-        <button type="button" class="secondary" id="clearBtn" data-i18n="btnClear"></button>
+        <button type="button" class="secondary" id="tplSaveBtn" data-i18n="btnTplSave"></button>
+        <button type="button" class="secondary danger" id="delBtn" data-i18n="btnDeleteEvent"></button>
       </div>
       <div id="impMsg" class="msg" role="status"></div>
     </form>
@@ -548,7 +553,6 @@
       fDesc: "Description", fDescHint: "(agenda, notes)",
       fReminder: "Reminder",
       rNone: "None", r15: "15 minutes before", r30: "30 minutes before", r60: "1 hour before", r1440: "1 day before",
-      btnClear: "Clear all",
       dlEventsLegend: "Events to download",
       fileModeLegend: "Files",
       modeCombined: "One file with the selected events", modeSeparate: "One file per selected event",
@@ -616,7 +620,6 @@
       fDesc: "説明", fDescHint: "(アジェンダ、メモ)",
       fReminder: "リマインダー",
       rNone: "なし", r15: "15分前", r30: "30分前", r60: "1時間前", r1440: "1日前",
-      btnClear: "すべてクリア",
       dlEventsLegend: "ダウンロードするイベント",
       fileModeLegend: "ファイル",
       modeCombined: "選択したイベントを1つのファイルにまとめる", modeSeparate: "選択したイベントごとに1ファイル",
@@ -844,7 +847,6 @@
   function cards() { return Array.prototype.slice.call($("events").children); }
 
   // Event data is saved in the browser on every change and restored on load.
-  // "Clear all" is the only action that removes it.
   var EVENTS_KEY = "icsEvents";
   var MAX_EVENTS = 20;
   // Plain data of one card (used for saving, duplicating, undoing a deletion).
@@ -929,13 +931,7 @@
 
   function cardHtml(n) {
     return '' +
-      '<div class="cardhead"><div class="headleft">' +
-      '<input type="checkbox" class="f-sel" checked hidden></div>' +
-      '<div class="cardbtns">' +
-        '<button type="button" class="secondary small tplsave" data-i18n="btnTplSave"></button>' +
-        '<button type="button" class="secondary small del" data-i18n="btnDeleteEvent"></button>' +
-      '</div></div>' +
-
+      '<input type="checkbox" class="f-sel" checked hidden>' +
       '<label for="title' + n + '" style="margin-top:0" data-i18n="fTitle"></label>' +
       '<input id="title' + n + '" class="f-title" type="text" data-i18n-ph="phTitle">' +
 
@@ -1065,9 +1061,9 @@
   function numberCards() {
     var all = cards(), full = all.length >= MAX_EVENTS;
     all.forEach(function (card, i) {
-      q(card, ".del").style.display = all.length < 2 ? "none" : ""; // the last remaining event cannot be deleted
     });
     $("addEvent").disabled = full;
+    $("delBtn").hidden = all.length < 2; // the last remaining event cannot be deleted
     if (full) setAddMenuOpen(false);
     renderEvTabs();
   }
@@ -1152,21 +1148,24 @@
     q(card, ".f-sel").addEventListener("change", function () { syncEvTabs(); renderOutput(); });
 
     // Save as template
-    q(card, ".tplsave").addEventListener("click", function () { openTplDialog(card); });
+    // (the Save as template button is in the row below the events and acts on the event being viewed)
 
     // Delete (with undo) and zone dialog
-    q(card, ".del").addEventListener("click", function () {
-      if (cards().length < 2) return;
-      var state = { ev: readCard(card), index: cards().indexOf(card) };
-      card.parentNode.removeChild(card);
-      var rest = cards();
-      activeCard = rest[Math.min(state.index, rest.length - 1)]; // the next event, or the previous one
-      numberCards();
-      renderOutput();
-      showToast(state);
-    });
     q(card, ".modzones").addEventListener("click", openZoneDialog);
   }
+
+  // Delete the event being viewed (with undo).
+  $("delBtn").addEventListener("click", function () {
+    var card = activeCard;
+    if (!card || cards().length < 2) return;
+    var state = { ev: readCard(card), index: cards().indexOf(card) };
+    card.parentNode.removeChild(card);
+    var rest = cards();
+    activeCard = rest[Math.min(state.index, rest.length - 1)]; // the next event, or the previous one
+    numberCards();
+    renderOutput();
+    showToast(state);
+  });
 
   function commitTz(card) {
     var el = q(card, ".f-tz"), note = q(card, ".tznote");
@@ -2226,6 +2225,7 @@
     saveSettings();
     closeTplDialog();
   }
+  $("tplSaveBtn").addEventListener("click", function () { if (activeCard) openTplDialog(activeCard); });
   $("tplSave").addEventListener("click", saveTemplate);
   $("tplCancel").addEventListener("click", closeTplDialog);
   $("tplDialog").addEventListener("close", function () { tplSource = null; });
@@ -2390,16 +2390,6 @@
 
   // Clear: removes all events and leaves one empty event.
   // Saved settings (zone list, templates, language, theme) are kept.
-  $("clearBtn").addEventListener("click", function () {
-    $("events").innerHTML = "";
-    var card = addCard(settings.refTz);
-    generated = null;
-    hideToast();
-    impState = null; renderImpMsg();
-    renderOutput();
-    q(card, ".f-title").focus();
-  });
-
   // Copy buttons for the generated subject and message.
   Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (btn) {
     btn.addEventListener("click", function () {
